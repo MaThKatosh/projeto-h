@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/lib/auth/dal";
+import { getDb } from "@/lib/db";
+import { getHotelSettings } from "@/lib/settings";
 import { LoginForm } from "./login-form";
 
 export default async function EntrarPage() {
   if (await getCurrentSession()) redirect("/mapa");
+  const { hotelName } = await getHotelSettings(getDb());
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-700 to-indigo-900 p-4">
@@ -12,7 +15,7 @@ export default async function EntrarPage() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-black text-white">
             H
           </div>
-          <h1 className="text-xl font-bold">Sistema do Hotel</h1>
+          <h1 className="text-xl font-bold">{hotelName}</h1>
           <p className="text-sm text-zinc-500">Entre com o usuário que o gerente criou para você.</p>
         </div>
         <LoginForm />

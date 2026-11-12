@@ -59,6 +59,8 @@ export type Permission =
   | "minibar.post" // lançar consumo do frigobar
   | "audit.run" // rodar a auditoria noturna
   | "reports.view" // relatórios (cada relatório pode restringir mais)
+  | "settings.manage" // configurações do hotel, bandeiras, formas de pagamento
+  | "undo" // desfazer auditoria, check-in, check-out; reativar reserva
   | "users.manage";
 
 const PERMISSIONS: Record<Permission, readonly Role[]> = {
@@ -85,6 +87,8 @@ const PERMISSIONS: Record<Permission, readonly Role[]> = {
   // O recepcionista da noite costuma fazer a auditoria.
   "audit.run": ["ADMIN", "GERENTE", "RECEPCAO"],
   "reports.view": ["ADMIN", "GERENTE", "RECEPCAO"],
+  "settings.manage": ["ADMIN", "GERENTE"],
+  "undo": ["ADMIN", "GERENTE"],
   "users.manage": ["ADMIN", "GERENTE"],
 };
 

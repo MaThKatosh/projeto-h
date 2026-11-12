@@ -2,19 +2,23 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/dal";
 import { auditChecklist, auditHistory } from "@/lib/night-audit/service";
-import { formatDate, localToday } from "@/lib/dates";
+import { addDays, formatDate, localToday } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
 import { LiveRefresher } from "@/components/live-refresher";
 import { dateTime } from "@/components/time";
-import { NoShowButton, RunAuditButton } from "./buttons";
+import { NoShowButton, RunAuditButton, UndoAuditButton } from "./buttons";
+import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AuditoriaPage() {
-  await requirePermission("audit.run");
+  const { user } = await requirePermission("audit.run");
   const db = getDb();
   const [check, history] = await Promise.all([auditChecklist(db), auditHistory(db, 15)]);
   const calendar = localToday();
+  const lastValid = history.find((h) => !h.undoneAt);
+  // Só a última auditoria, e só se a data do sistema ainda é a que ela deixou.
+  const undoable = can(user.role, "undo") && lastValid && check.today === addDays(lastValid.businessDate, 1);
 
   return (
     <div className="max-w-5xl space-y-5">
@@ -98,6 +102,7 @@ export default async function AuditoriaPage() {
           <h2 className="font-semibold">Auditorias anteriores</h2>
           <Link href="/relatorios/ocupacao" className="text-sm text-blue-700 underline">relatório de ocupação</Link>
         </div>
+        {undoable && lastValid && <div className="mb-3"><UndoAuditButton date={formatDate(lastValid.businessDate, true)} /></div>}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="text-left text-xs text-zinc-500">
@@ -112,8 +117,11 @@ export default async function AuditoriaPage() {
             </thead>
             <tbody>
               {history.map((h) => (
-                <tr key={h.id} className="border-b border-zinc-100">
-                  <td className="py-2 font-semibold">{formatDate(h.businessDate, true)}</td>
+                <tr key={h.id} className={`border-b border-zinc-100 ${h.undoneAt ? "text-zinc-400" : ""}`}>
+                  <td className="py-2 font-semibold">
+                    <span className={h.undoneAt ? "line-through" : ""}>{formatDate(h.businessDate, true)}</span>
+                    {h.undoneAt && <span className="block text-xs font-normal text-red-700">desfeita por {h.undoneByName}: {h.undoReason}</span>}
+                  </td>
                   <td className="py-2">{h.roomsOccupied}/{h.roomsAvailable} ({h.roomsAvailable ? Math.round((h.roomsOccupied / h.roomsAvailable) * 100) : 0}%)</td>
                   <td className="py-2">{h.nightsPosted} · {formatBRL(h.nightsCents)}</td>
                   <td className="py-2 text-right">{formatBRL(h.revenueCents)}</td>

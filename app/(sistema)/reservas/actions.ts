@@ -163,3 +163,19 @@ export async function refundAction(reservationId: string, input: unknown) {
 export async function reverseAction(entryId: string, reason: string) {
   return run((db, u) => folio.reverseEntry(db, u, entryId, reason));
 }
+
+// ----------------------------------------------------------------
+// Desfazer (gerente / administrador)
+// ----------------------------------------------------------------
+
+export async function undoCheckInAction(id: string, reason: string) {
+  return run((db, u) => svc.undoCheckIn(db, u, id, reason));
+}
+
+export async function undoCheckOutAction(id: string, reason: string) {
+  return run((db, u) => svc.undoCheckOut(db, u, id, reason));
+}
+
+export async function reactivateAction(id: string, reason: string) {
+  return run((db, u) => svc.reactivateReservation(db, u, id, reason));
+}

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { verifySession } from "@/lib/auth/dal";
 import { publish } from "@/lib/realtime";
-import { runAudit } from "@/lib/night-audit/service";
+import { runAudit, undoLastAudit } from "@/lib/night-audit/service";
 
 export async function runAuditAction(): Promise<{ ok: boolean; error?: string; message?: string }> {
   const { user } = await verifySession();
@@ -18,5 +18,19 @@ export async function runAuditAction(): Promise<{ ok: boolean; error?: string; m
   } catch (error) {
     console.error(error);
     return { ok: false, error: "A auditoria não foi concluída e nada foi alterado. Tente de novo." };
+  }
+}
+
+export async function undoAuditAction(reason: string): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const { user } = await verifySession();
+  try {
+    const r = await getDb().$transaction((tx) => undoLastAudit(tx, user, reason), { timeout: 120_000, maxWait: 10_000 });
+    if (!r.ok) return { ok: false, error: r.error };
+    await publish({ type: "reservations.changed" });
+    revalidatePath("/", "layout");
+    return { ok: true, message: `${r.reversed} lançamento(s) estornado(s). A data do sistema voltou para ${r.date.split("-").reverse().join("/")}.` };
+  } catch (error) {
+    console.error(error);
+    return { ok: false, error: "Não foi possível desfazer; nada foi alterado." };
   }
 }

@@ -7,6 +7,7 @@ import { fromDateStr } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
 import { getBusinessDate } from "@/lib/hotel-date";
 import { postOutletCharge } from "@/lib/folio/service";
+import { checkPaymentChoice } from "@/lib/settings";
 import { METHOD, type Method } from "@/lib/folio/rules";
 import {
   comandaTotals,
@@ -81,7 +82,7 @@ const comandaSelect = {
       createdBy: { select: { fullName: true } },
     },
   },
-  payments: { orderBy: { createdAt: "asc" as const }, select: { id: true, method: true, amountCents: true, reference: true, createdAt: true } },
+  payments: { orderBy: { createdAt: "asc" as const }, select: { id: true, method: true, amountCents: true, reference: true, cardBrand: true, createdAt: true } },
 } as const;
 
 type ComandaRow = NonNullable<Awaited<ReturnType<typeof findComanda>>>;
@@ -333,6 +334,8 @@ export async function addPosPayment(db: Db, actor: SessionUser, comandaId: strin
   if (no) return no;
   const parsed = posPaymentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Revise os campos.", fieldErrors: fieldErrors(parsed.error) };
+  const choice = await checkPaymentChoice(db, parsed.data.method, parsed.data.cardBrand);
+  if (choice) return { ok: false, error: choice };
   const c = await findComanda(db, comandaId);
   if (!c || c.status !== "ABERTA") return { ok: false, error: "Comanda encerrada." };
   const { remaining } = toView(c).totals;
@@ -345,6 +348,7 @@ export async function addPosPayment(db: Db, actor: SessionUser, comandaId: strin
       method: parsed.data.method,
       amountCents: parsed.data.amount,
       reference: parsed.data.reference,
+      cardBrand: parsed.data.method === "CREDITO" || parsed.data.method === "DEBITO" ? parsed.data.cardBrand : null,
       businessDate: fromDateStr(await getBusinessDate(db)),
       createdById: actor.id,
     },

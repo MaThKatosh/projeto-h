@@ -70,6 +70,7 @@ export const posPaymentSchema = z.object({
   method: z.enum(METHODS, { error: "Escolha a forma de pagamento." }),
   amount: money(1),
   reference: z.string().trim().max(60).optional().transform((v) => v || null),
+  cardBrand: z.string().trim().max(30).optional().transform((v) => v || null),
 });
 
 export const menuItemSchema = z.object({

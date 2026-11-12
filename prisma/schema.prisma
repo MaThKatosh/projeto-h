@@ -38,6 +38,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   lastLoginAt  DateTime?
+  // Idioma escolhido pelo funcionário (null = idioma padrão do hotel).
+  locale       String?
 
   sessions      AuthSession[]
   auditLogs     AuditLog[]
@@ -58,7 +60,8 @@ model User {
   comandasClosed      Comanda[]          @relation("ComandaCloser")
   comandaItems        ComandaItem[]
   posPayments         PosPayment[]
-  auditRuns           AuditRun[]
+  auditRuns           AuditRun[]       @relation("AuditRunner")
+  auditUndos          AuditRun[]       @relation("AuditUndoer")
 }
 
 model AuthSession {
@@ -530,6 +533,8 @@ model FolioEntry {
   reference     String?         // NSU, autorização, ID do Pix (NUNCA número de cartão)
   installments  Int?
   isRefund      Boolean         @default(false) // devolução de crédito ao hóspede
+  cardBrand     String?         // bandeira do cartão (crédito/débito)
+  auditRunId    String?         @db.Uuid        // lançado pela auditoria noturna
   businessDate  DateTime        @db.Date
   createdById   String?         @db.Uuid
   createdAt     DateTime        @default(now())
@@ -545,6 +550,7 @@ model FolioEntry {
   reversedBy  User?       @relation("FolioReverser", fields: [reversedById], references: [id], onDelete: SetNull)
   reversalOf  FolioEntry? @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversal    FolioEntry? @relation("Reversal")
+  auditRun    AuditRun?   @relation(fields: [auditRunId], references: [id], onDelete: Restrict)
 
   @@index([reservationId, createdAt])
   @@index([businessDate, kind])
@@ -667,6 +673,7 @@ model PosPayment {
   method       PaymentMethod
   amountCents  Int
   reference    String?
+  cardBrand    String?
   businessDate DateTime      @db.Date
   createdById  String?       @db.Uuid
   createdAt    DateTime      @default(now())
@@ -686,7 +693,8 @@ model PosPayment {
 
 model AuditRun {
   id              String   @id @default(uuid()) @db.Uuid
-  businessDate    DateTime @unique @db.Date // dia que foi fechado
+  // Uma auditoria VÁLIDA por dia (índice parcial na migration: ignora as desfeitas).
+  businessDate    DateTime @db.Date         // dia que foi fechado
   nextDate        DateTime @db.Date         // nova data do sistema
   userId          String?  @db.Uuid
   startedAt       DateTime @default(now())
@@ -700,6 +708,24 @@ model AuditRun {
   revenueCents    Int      @default(0)      // todas as cobranças do dia
   receivedCents   Int      @default(0)      // todos os pagamentos do dia (quartos + restaurante)
   summary         Json?
+  undoneAt        DateTime?
+  undoneById      String?  @db.Uuid
+  undoReason      String?
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user     User?        @relation("AuditRunner", fields: [userId], references: [id], onDelete: SetNull)
+  undoneBy User?        @relation("AuditUndoer", fields: [undoneById], references: [id], onDelete: SetNull)
+  entries  FolioEntry[]
+
+  @@index([businessDate])
+}
+
+// ================================================================
+// CONFIGURAÇÕES: BANDEIRAS DE CARTÃO
+// ================================================================
+
+model CardBrand {
+  id        String  @id @default(uuid()) @db.Uuid
+  name      String  @unique // "Visa", "Mastercard", "Elo"...
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
 }

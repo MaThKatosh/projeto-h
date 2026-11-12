@@ -104,6 +104,7 @@ export const paymentSchema = z.object({
   amount: cents(1),
   reference: z.string().trim().max(60).optional().transform((v) => v || null),
   installments: z.coerce.number().int().min(1).max(12).optional(),
+  cardBrand: z.string().trim().max(30).optional().transform((v) => v || null),
 });
 
 export const refundSchema = z.object({

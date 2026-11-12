@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { getDb } from "@/lib/db";
+import { getHotelSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: "Projeto H — Sistema do Hotel",
-  description: "Recepção, governança, manutenção e mais, num só lugar.",
-};
+// O nome do hotel vem das configurações.
+export async function generateMetadata(): Promise<Metadata> {
+  const { hotelName } = await getHotelSettings(getDb());
+  return { title: hotelName, description: "Recepção, governança, manutenção e mais, num só lugar." };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

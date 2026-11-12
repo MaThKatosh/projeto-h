@@ -340,12 +340,12 @@ export const REPORTS: ReportDef[] = [
         db.folioEntry.findMany({
           where: { kind: "PAGAMENTO", businessDate: byBusinessDate(p), ...(method ? { method } : {}) },
           orderBy: { createdAt: "asc" },
-          select: { businessDate: true, createdAt: true, method: true, amountCents: true, reference: true, installments: true, description: true, createdBy: { select: { fullName: true } }, reservation: { select: { number: true, room: { select: { number: true } }, guest: { select: { fullName: true } } } } },
+          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, installments: true, description: true, createdBy: { select: { fullName: true } }, reservation: { select: { number: true, room: { select: { number: true } }, guest: { select: { fullName: true } } } } },
         }),
         db.posPayment.findMany({
           where: { businessDate: byBusinessDate(p), ...(method ? { method } : {}) },
           orderBy: { createdAt: "asc" },
-          select: { businessDate: true, createdAt: true, method: true, amountCents: true, reference: true, createdBy: { select: { fullName: true } }, comanda: { select: { number: true } } },
+          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, createdBy: { select: { fullName: true } }, comanda: { select: { number: true } } },
         }),
       ]);
       const rows = [
@@ -355,6 +355,7 @@ export const REPORTS: ReportDef[] = [
           forma: METHOD[f.method as Method].label,
           origem: `Quarto ${f.reservation.room?.number ?? "—"} · ${f.reservation.guest.fullName}`,
           detalhe: f.description + (f.installments && f.installments > 1 ? ` (${f.installments}x)` : ""),
+          bandeira: f.cardBrand,
           referencia: f.reference,
           por: f.createdBy?.fullName ?? "—",
           valor: f.amountCents,
@@ -365,6 +366,7 @@ export const REPORTS: ReportDef[] = [
           forma: METHOD[x.method as Method].label,
           origem: `Restaurante comanda nº ${x.comanda.number}`,
           detalhe: "Pagamento no restaurante",
+          bandeira: x.cardBrand,
           referencia: x.reference,
           por: x.createdBy?.fullName ?? "—",
           valor: x.amountCents,
@@ -380,12 +382,20 @@ export const REPORTS: ReportDef[] = [
           { key: "forma", label: "Forma" },
           { key: "origem", label: "Origem" },
           { key: "detalhe", label: "Detalhe" },
+          { key: "bandeira", label: "Bandeira" },
           { key: "referencia", label: "NSU / ID" },
           { key: "por", label: "Recebido por" },
           { key: "valor", label: "Valor", type: "money", total: true },
         ],
         rows,
-        summary: byMethod.map((x) => ({ label: METHOD[x.m].label, value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(x.v / 100) })),
+        summary: [
+          ...byMethod.map((x) => ({ label: METHOD[x.m].label, value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(x.v / 100) })),
+          // Cartões por bandeira (para conferir com o extrato da maquininha).
+          ...[...new Set(rows.filter((r) => r.bandeira).map((r) => r.bandeira as string))].map((b) => ({
+            label: `Cartão ${b}`,
+            value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(rows.filter((r) => r.bandeira === b).reduce((s2, r) => s2 + r.valor, 0) / 100),
+          })),
+        ],
         note: "Estornos e devoluções aparecem com valor negativo.",
       };
     },
@@ -671,7 +681,7 @@ export const REPORTS: ReportDef[] = [
     period: "range",
     defaultPeriod: "month",
     async run(db, p) {
-      const rows = await db.auditRun.findMany({ where: { businessDate: byBusinessDate(p) }, orderBy: { businessDate: "asc" } });
+      const rows = await db.auditRun.findMany({ where: { businessDate: byBusinessDate(p), undoneAt: null }, orderBy: { businessDate: "asc" } });
       return {
         columns: [
           { key: "dia", label: "Dia", type: "date" },

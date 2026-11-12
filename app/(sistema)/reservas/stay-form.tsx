@@ -166,6 +166,15 @@ export function StayForm({
 
   const fe = errors.fieldErrors;
 
+  // O que ainda falta para o botão liberar — dito na tela, em vez de só
+  // deixar o botão apagado.
+  const missing = [
+    !validDates && "a saída precisa ser depois da entrada",
+    !roomTypeId && (mode === "direto" ? "escolha o quarto (ou o tipo de quarto)" : "escolha o tipo de quarto"),
+    mode === "direto" && roomTypeId && !roomId && "escolha o quarto",
+    dailyCents === null && "informe o valor da diária",
+  ].filter(Boolean) as string[];
+
   return (
     <form
       ref={formRef}
@@ -282,7 +291,20 @@ export function StayForm({
               <span className="text-xs text-zinc-500">
                 Quarto {mode === "direto" ? "* (só aparecem quartos limpos e livres)" : "(opcional — pode escolher depois)"}
               </span>
-              <select className="field" value={roomId} onChange={(e) => setRoomId(e.target.value)} required={mode === "direto"}>
+              <select
+                className="field"
+                value={roomId}
+                required={mode === "direto"}
+                onChange={(e) => {
+                  setRoomId(e.target.value);
+                  // Escolher o quarto já define o tipo e a diária.
+                  const room = rooms?.find((r) => r.id === e.target.value);
+                  if (room && room.roomTypeId !== roomTypeId) {
+                    setRoomTypeId(room.roomTypeId);
+                    applyPlan(ratePlanId, room.roomTypeId);
+                  }
+                }}
+              >
                 <option value="">{mode === "direto" ? "Escolha o quarto" : "Escolher depois"}</option>
                 {roomChoices.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -374,8 +396,11 @@ export function StayForm({
       )}
 
       <FormMessage error={errors.error} />
+      {missing.length > 0 && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Para continuar: {missing.join(" · ")}.</p>
+      )}
       <div className="flex gap-2">
-        <button type="submit" className="btn-primary px-6 py-3" disabled={pending || !validDates || !roomTypeId}>
+        <button type="submit" className="btn-primary px-6 py-3" disabled={pending || missing.length > 0}>
           {pending ? "Salvando..." : mode === "direto" ? "Fazer check-in" : mode === "editar" ? "Salvar alterações" : "Confirmar reserva"}
         </button>
         {mode === "editar" && (

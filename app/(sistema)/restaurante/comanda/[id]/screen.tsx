@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { LiveDot, useLiveRefresh } from "@/components/live-refresh";
 import { clock } from "@/components/time";
 import { centsToInput, formatBRL, parseBRL } from "@/lib/money";
-import { METHOD, METHODS, type Method } from "@/lib/folio/rules";
+import { METHOD, type Method } from "@/lib/folio/rules";
+import { needsBrand, PaymentPicker, type PaymentOptions } from "@/components/payment-picker";
 import { change, ITEM_STATUS } from "@/lib/restaurant/rules";
 import type { ComandaView } from "@/lib/restaurant/service";
 import {
@@ -25,7 +26,19 @@ type MenuItem = { id: string; name: string; group: string; priceCents: number; k
 type Guest = { reservationId: string; number: number; name: string; room: string };
 type CartLine = { menuItemId: string; name: string; priceCents: number; quantity: number; notes: string };
 
-export function ComandaScreen({ c, menu, guests, canCancel }: { c: ComandaView; menu: MenuItem[]; guests: Guest[]; canCancel: boolean }) {
+export function ComandaScreen({
+  c,
+  menu,
+  guests,
+  canCancel,
+  paymentOptions,
+}: {
+  c: ComandaView;
+  menu: MenuItem[];
+  guests: Guest[];
+  canCancel: boolean;
+  paymentOptions: PaymentOptions;
+}) {
   const router = useRouter();
   const connected = useLiveRefresh(["restaurant.changed"]);
   const [pending, start] = useTransition();
@@ -132,14 +145,14 @@ export function ComandaScreen({ c, menu, guests, canCancel }: { c: ComandaView; 
             {c.payments.length > 0 && (
               <ul className="mt-2 space-y-1 text-xs text-zinc-600">
                 {c.payments.map((p) => (
-                  <li key={p.id}>{METHOD[p.method].icon} {METHOD[p.method].label} {formatBRL(p.amountCents)} às {clock(p.createdAt)}</li>
+                  <li key={p.id}>{METHOD[p.method].icon} {METHOD[p.method].label}{p.cardBrand ? ` ${p.cardBrand}` : ""} {formatBRL(p.amountCents)} às {clock(p.createdAt)}</li>
                 ))}
               </ul>
             )}
           </section>
 
           {open && (
-            <Settle c={c} guests={guests} pending={pending} canCancel={canCancel} act={act} onClosed={() => router.push("/restaurante")} />
+            <Settle c={c} guests={guests} pending={pending} canCancel={canCancel} paymentOptions={paymentOptions} act={act} onClosed={() => router.push("/restaurante")} />
           )}
         </div>
       </div>
@@ -230,6 +243,7 @@ function Settle({
   canCancel,
   act,
   onClosed,
+  paymentOptions,
 }: {
   c: ComandaView;
   guests: Guest[];
@@ -237,8 +251,10 @@ function Settle({
   canCancel: boolean;
   act: (fn: () => Promise<ActionResult>, ok: string, after?: () => void) => void;
   onClosed: () => void;
+  paymentOptions: PaymentOptions;
 }) {
-  const [method, setMethod] = useState<Method>("DINHEIRO");
+  const [method, setMethod] = useState<Method>(paymentOptions.methods.includes("DINHEIRO") ? "DINHEIRO" : paymentOptions.methods[0]);
+  const [brand, setBrand] = useState("");
   const [given, setGiven] = useState(centsToInput(Math.max(0, c.totals.remaining)));
   const [room, setRoom] = useState(c.guest?.inHouse ? c.guest.reservationId : "");
   const givenCents = parseBRL(given) ?? 0;
@@ -271,12 +287,8 @@ function Settle({
 
       <div className="rounded-xl bg-emerald-50 p-3">
         <h3 className="mb-2 text-sm font-semibold">💵 Receber aqui</h3>
-        <div className="mb-2 flex flex-wrap gap-1">
-          {METHODS.map((m) => (
-            <button key={m} className={`rounded-lg border-2 px-2 py-1 text-xs ${method === m ? "border-emerald-600 bg-white" : "border-transparent bg-white/60"}`} onClick={() => setMethod(m)}>
-              {METHOD[m].icon} {METHOD[m].label}
-            </button>
-          ))}
+        <div className="mb-2">
+          <PaymentPicker options={paymentOptions} method={method} onMethod={setMethod} brand={brand} onBrand={setBrand} small />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-sm">
@@ -286,8 +298,8 @@ function Settle({
           {troco > 0 && <span className="rounded bg-white px-2 py-1 text-sm font-bold">Troco: {formatBRL(troco)}</span>}
           <button
             className="btn bg-emerald-600 text-white hover:bg-emerald-700"
-            disabled={pending || toRegister <= 0}
-            onClick={() => act(() => posPaymentAction(c.id, { method, amount: centsToInput(toRegister) }), `Pagamento de ${formatBRL(toRegister)} registrado.`, () => setGiven("0,00"))}
+            disabled={pending || toRegister <= 0 || needsBrand(paymentOptions, method, brand)}
+            onClick={() => act(() => posPaymentAction(c.id, { method, amount: centsToInput(toRegister), cardBrand: brand }), `Pagamento de ${formatBRL(toRegister)} registrado.`, () => setGiven("0,00"))}
           >
             Registrar {formatBRL(Math.max(0, toRegister))}
           </button>

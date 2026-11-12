@@ -6,7 +6,7 @@ import { can } from "@/lib/permissions";
 import { formatDate, fromDateStr, localToday, toDateStr, type DateStr } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
 import { getBusinessDate } from "@/lib/hotel-date";
-import { getParkingDailyCents } from "@/lib/settings";
+import { checkPaymentChoice, getParkingDailyCents } from "@/lib/settings";
 import {
   CATEGORY_LABEL,
   chargeSchema,
@@ -198,7 +198,13 @@ export async function previewNights(db: Db, reservationId: string, until: DateSt
   return { nights, total };
 }
 
-export async function postNights(db: Db, actor: { id: string } | null, reservationId: string, until: DateStr) {
+export async function postNights(
+  db: Db,
+  actor: { id: string } | null,
+  reservationId: string,
+  until: DateStr,
+  opts: { auditRunId?: string } = {}
+) {
   const [stay, rows, today, parkingDaily] = await Promise.all([
     stayInfo(db, reservationId),
     loadEntries(db, reservationId),
@@ -222,6 +228,7 @@ export async function postNights(db: Db, actor: { id: string } | null, reservati
           nightDate: fromDateStr(night),
           businessDate: fromDateStr(today),
           createdById: actor?.id ?? null,
+          auditRunId: opts.auditRunId ?? null,
         },
       });
       total += c.amountCents;
@@ -331,7 +338,10 @@ export async function addPayment(db: Db, actor: SessionUser, reservationId: stri
   const closed = await openFolio(db, reservationId, true);
   if (closed) return { ok: false, error: closed };
 
-  const { method, amount, reference, installments } = parsed.data;
+  const { method, amount, reference, installments, cardBrand } = parsed.data;
+  const choice = await checkPaymentChoice(db, method, cardBrand);
+  if (choice) return { ok: false, error: choice };
+  const isCard = method === "CREDITO" || method === "DEBITO";
   if ((method === "CREDITO" || method === "DEBITO") && reference && /\d{12,}/.test(reference.replace(/\D/g, ""))) {
     // Proteção: nunca guardar número de cartão.
     return { ok: false, error: "Revise os campos destacados.", fieldErrors: { reference: ["Não digite o número do cartão. Use só o NSU ou o código de autorização."] } };
@@ -341,7 +351,8 @@ export async function addPayment(db: Db, actor: SessionUser, reservationId: stri
       reservationId,
       kind: "PAGAMENTO",
       method,
-      description: `Pagamento ${METHOD[method].label}${method === "CREDITO" && installments && installments > 1 ? ` em ${installments}x` : ""}`,
+      description: `Pagamento ${METHOD[method].label}${isCard && cardBrand ? ` ${cardBrand}` : ""}${method === "CREDITO" && installments && installments > 1 ? ` em ${installments}x` : ""}`,
+      cardBrand: isCard ? cardBrand : null,
       amountCents: amount,
       reference,
       installments: method === "CREDITO" ? (installments ?? 1) : null,
@@ -419,27 +430,7 @@ export async function reverseEntry(db: Db, actor: SessionUser, entryId: string, 
     return { ok: false, error: "Conta encerrada: não dá para estornar depois do check-out." };
   }
 
-  const now = new Date();
-  await db.folioEntry.update({
-    where: { id: e.id },
-    data: { reversedAt: now, reversedById: actor.id, reverseReason: parsed.data },
-  });
-  await db.folioEntry.create({
-    data: {
-      reservationId: e.reservationId,
-      kind: e.kind,
-      category: e.category,
-      method: e.method,
-      description: `Estorno: ${e.description}`,
-      amountCents: -e.amountCents,
-      nightDate: e.nightDate,
-      isRefund: e.isRefund,
-      reversalOfId: e.id,
-      reversedAt: null,
-      businessDate: fromDateStr(await getBusinessDate(db)),
-      createdById: actor.id,
-    },
-  });
+  await reverseRaw(db, actor.id, e.id, parsed.data);
   await event(db, e.reservationId, actor.id, "estorno", `${e.description} (${formatBRL(e.amountCents)}): ${parsed.data}`);
   await audit(db, "folio.reverse", { userId: actor.id, metadata: { entryId, amount: e.amountCents, reason: parsed.data } });
   return { ok: true, reservationId: e.reservationId };
@@ -532,4 +523,32 @@ export async function openAccounts(db: Db) {
       };
     })
     .sort((a, b) => b.balance - a.balance);
+}
+
+// Estorna um lançamento SEM conferir permissão nem situação da conta.
+// Uso interno (estorno pela tela e "desfazer auditoria"), que conferem
+// antes. Copia forma, bandeira e noite, para os relatórios baterem.
+export async function reverseRaw(db: Db, actorId: string, entryId: string, reason: string) {
+  const e = await db.folioEntry.findUniqueOrThrow({
+    where: { id: entryId },
+    select: { id: true, reservationId: true, kind: true, category: true, method: true, cardBrand: true, description: true, amountCents: true, nightDate: true, isRefund: true },
+  });
+  await db.folioEntry.update({ where: { id: e.id }, data: { reversedAt: new Date(), reversedById: actorId, reverseReason: reason } });
+  await db.folioEntry.create({
+    data: {
+      reservationId: e.reservationId,
+      kind: e.kind,
+      category: e.category,
+      method: e.method,
+      cardBrand: e.cardBrand,
+      description: `Estorno: ${e.description}`,
+      amountCents: -e.amountCents,
+      nightDate: e.nightDate,
+      isRefund: e.isRefund,
+      reversalOfId: e.id,
+      businessDate: fromDateStr(await getBusinessDate(db)),
+      createdById: actorId,
+    },
+  });
+  return e;
 }

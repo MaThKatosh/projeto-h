@@ -6,6 +6,7 @@ import { dateTime } from "@/components/time";
 import type { FieldErrors } from "@/lib/auth/validation";
 import type { FolioView, FolioEntryView } from "@/lib/folio/service";
 import { CATEGORY_LABEL, MANUAL_CATEGORIES, METHOD, METHODS, type Category, type Method } from "@/lib/folio/rules";
+import { needsBrand, PaymentPicker, type PaymentOptions } from "@/components/payment-picker";
 import { formatDate } from "@/lib/dates";
 import { centsToInput, formatBRL } from "@/lib/money";
 import { addChargeAction, addPaymentAction, postNightsAction, refundAction, reverseAction, type ActionResult } from "../actions";
@@ -22,9 +23,11 @@ export function Folio({
   status,
   canPost,
   canReverse,
+  options,
   onDone,
 }: {
   reservationId: string;
+  options: PaymentOptions;
   folio: FolioView;
   status: string;
   canPost: boolean;
@@ -87,7 +90,7 @@ export function Folio({
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
 
       {mode === "pagamento" && (
-        <PaymentForm reservationId={reservationId} suggested={Math.max(0, folio.balance + (inHouse ? folio.checkoutPreview : 0))} onClose={() => setMode(null)} onDone={finish} />
+        <PaymentForm reservationId={reservationId} suggested={Math.max(0, folio.balance + (inHouse ? folio.checkoutPreview : 0))} options={options} onClose={() => setMode(null)} onDone={finish} />
       )}
       {mode === "cobranca" && <ChargeForm reservationId={reservationId} onClose={() => setMode(null)} onDone={finish} />}
       {mode === "devolucao" && <RefundForm reservationId={reservationId} credit={-folio.balance} onClose={() => setMode(null)} onDone={finish} />}
@@ -193,12 +196,20 @@ function Frame({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-export function PaymentForm({ reservationId, suggested, onClose, onDone }: FormProps & { reservationId: string; suggested: number }) {
-  const [method, setMethod] = useState<Method>("PIX");
+export function PaymentForm({
+  reservationId,
+  suggested,
+  options,
+  onClose,
+  onDone,
+}: FormProps & { reservationId: string; suggested: number; options: PaymentOptions }) {
+  const [method, setMethod] = useState<Method>(options.methods.includes("PIX") ? "PIX" : options.methods[0]);
+  const [brand, setBrand] = useState("");
   const [amount, setAmount] = useState(suggested > 0 ? centsToInput(suggested) : "");
   const [reference, setReference] = useState("");
   const [installments, setInstallments] = useState(1);
   const { pending, state, submit } = useSubmit();
+  const missingBrand = needsBrand(options, method, brand);
 
   return (
     <Frame title="Receber pagamento" onClose={onClose}>
@@ -206,22 +217,10 @@ export function PaymentForm({ reservationId, suggested, onClose, onDone }: FormP
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          submit(() => addPaymentAction(reservationId, { method, amount, reference, installments }), "Pagamento registrado.", onDone);
+          submit(() => addPaymentAction(reservationId, { method, amount, reference, installments, cardBrand: brand }), "Pagamento registrado.", onDone);
         }}
       >
-        <div className="flex flex-wrap gap-2">
-          {METHODS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={method === m}
-              onClick={() => setMethod(m)}
-              className={`rounded-lg border-2 px-3 py-2 text-sm font-medium ${method === m ? "border-blue-600 bg-blue-50" : "border-zinc-200 hover:border-zinc-400"}`}
-            >
-              {METHOD[m].icon} {METHOD[m].label}
-            </button>
-          ))}
-        </div>
+        <PaymentPicker options={options} method={method} onMethod={setMethod} brand={brand} onBrand={setBrand} />
         <div className="grid gap-3 sm:grid-cols-3">
           <label>
             <span className="text-xs text-zinc-500">Valor (R$)</span>
@@ -250,7 +249,8 @@ export function PaymentForm({ reservationId, suggested, onClose, onDone }: FormP
           <p className="text-xs text-zinc-500">O pagamento é feito na maquininha. Aqui só se registra — nunca digite o número do cartão.</p>
         )}
         <FormMessage error={state.fieldErrors ? undefined : state.error} />
-        <button className="btn bg-emerald-600 text-white hover:bg-emerald-700" disabled={pending}>{pending ? "Registrando..." : "Registrar pagamento"}</button>
+        {missingBrand && <p className="text-xs text-amber-700">Escolha a bandeira do cartão.</p>}
+        <button className="btn bg-emerald-600 text-white hover:bg-emerald-700" disabled={pending || missingBrand}>{pending ? "Registrando..." : "Registrar pagamento"}</button>
       </form>
     </Frame>
   );

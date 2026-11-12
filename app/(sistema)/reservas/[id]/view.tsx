@@ -17,6 +17,7 @@ import { GuestFields, readGuest, readVehicle, VehicleFields } from "../guest-fie
 import { StayForm } from "../stay-form";
 import type { FolioView } from "@/lib/folio/service";
 import { Balance, Folio, PaymentForm } from "./folio";
+import type { PaymentOptions } from "@/components/payment-picker";
 import {
   addCompanionAction,
   addVehicleAction,
@@ -26,6 +27,9 @@ import {
   checkOutAction,
   freeRoomsAction,
   moveRoomAction,
+  reactivateAction,
+  undoCheckInAction,
+  undoCheckOutAction,
   postNightsAction,
   readyRoomsAction,
   removeCompanionAction,
@@ -50,6 +54,8 @@ const EVENT_LABEL: Record<string, string> = {
   veiculo: "Garagem",
   conta: "Conta",
   estorno: "Estorno",
+  desfeito: "Desfeito",
+  reativada: "Reserva reativada",
 };
 
 export function ReservationView({
@@ -61,6 +67,8 @@ export function ReservationView({
   folio,
   canPost,
   canReverse,
+  paymentOptions,
+  canUndo,
   initialAction,
 }: {
   r: ReservationDetail;
@@ -71,6 +79,8 @@ export function ReservationView({
   folio: FolioView;
   canPost: boolean;
   canReverse: boolean;
+  paymentOptions: PaymentOptions;
+  canUndo: boolean;
   initialAction: "checkin" | "checkout" | null;
 }) {
   const router = useRouter();
@@ -124,6 +134,21 @@ export function ReservationView({
         )}
       </div>
 
+      {canUndo && (inHouse || r.status === "FINALIZADA" || r.status === "CANCELADA" || r.status === "NO_SHOW") && (
+        <UndoBar
+          label={inHouse ? "↶ Desfazer check-in" : r.status === "FINALIZADA" ? "↶ Desfazer check-out" : "↶ Reativar reserva"}
+          hint={
+            inHouse
+              ? "Check-in feito por engano? A reserva volta a confirmada e o quarto fica livre (a conta precisa estar sem lançamentos)."
+              : r.status === "FINALIZADA"
+                ? "Check-out feito por engano? O hóspede volta para o mesmo quarto, se ele ainda estiver livre."
+                : "Cancelada ou marcada “não compareceu” por engano? A reserva volta a confirmada, se ainda houver quarto."
+          }
+          action={(reason) => (inHouse ? undoCheckInAction(r.id, reason) : r.status === "FINALIZADA" ? undoCheckOutAction(r.id, reason) : reactivateAction(r.id, reason))}
+          onDone={done}
+        />
+      )}
+
       {message && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           ✓ {message} <button className="ml-2 underline" onClick={() => setMessage(null)}>ok</button>
@@ -131,7 +156,7 @@ export function ReservationView({
       )}
 
       {panel === "checkin" && <CheckInPanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
-      {panel === "checkout" && <CheckOutPanel r={r} today={today} folio={folio} canPost={canPost} onClose={() => setPanel(null)} onDone={done} onStep={() => router.refresh()} />}
+      {panel === "checkout" && <CheckOutPanel r={r} today={today} folio={folio} canPost={canPost} paymentOptions={paymentOptions} onClose={() => setPanel(null)} onDone={done} onStep={() => router.refresh()} />}
       {panel === "trocar" && <MovePanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
       {panel === "quarto" && <AssignPanel r={r} onClose={() => setPanel(null)} onDone={done} />}
       {(panel === "cancelar" || panel === "noshow") && <CancelPanel r={r} noShow={panel === "noshow"} onClose={() => setPanel(null)} onDone={done} />}
@@ -198,7 +223,7 @@ export function ReservationView({
         </section>
       </div>
 
-      <Folio reservationId={r.id} folio={folio} status={r.status} canPost={canPost} canReverse={canReverse} onDone={done} />
+      <Folio reservationId={r.id} options={paymentOptions} folio={folio} status={r.status} canPost={canPost} canReverse={canReverse} onDone={done} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-5">
@@ -393,7 +418,8 @@ function CheckOutPanel({
   onClose,
   onDone,
   onStep,
-}: PanelProps & { today: DateStr; folio: FolioView; canPost: boolean; onStep: () => void }) {
+  paymentOptions,
+}: PanelProps & { today: DateStr; folio: FolioView; canPost: boolean; onStep: () => void; paymentOptions: PaymentOptions }) {
   const { pending, state, run } = useAction();
   const [stepMsg, setStepMsg] = useState<string | null>(null);
   // Antecipada só se a saída efetiva encurta a estadia (1 noite é o mínimo).
@@ -438,7 +464,7 @@ function CheckOutPanel({
             {folio.balance < 0 && <p className="text-sm text-sky-800">O hóspede pagou a mais: use “Devolver crédito” na conta abaixo.</p>}
           </div>
           {folio.balance > 0 && nightsLeft === 0 && canPost && (
-            <PaymentForm reservationId={r.id} suggested={folio.balance} onClose={() => undefined} onDone={step} />
+            <PaymentForm reservationId={r.id} suggested={folio.balance} options={paymentOptions} onClose={() => undefined} onDone={step} />
           )}
         </Step>
 
@@ -645,6 +671,45 @@ function Item({ k, v }: { k: string; v: string }) {
     <div className="flex justify-between gap-3">
       <dt className="text-zinc-500">{k}</dt>
       <dd className="text-right font-medium">{v}</dd>
+    </div>
+  );
+}
+
+// Barra discreta de "desfazer" (gerente/admin), com motivo obrigatório.
+function UndoBar({
+  label,
+  hint,
+  action,
+  onDone,
+}: {
+  label: string;
+  hint: string;
+  action: (reason: string) => Promise<ActionResult>;
+  onDone: (msg: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const { pending, state, run } = useAction();
+  return (
+    <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-3 text-sm">
+      {!open ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-zinc-600">{hint}</span>
+          <button className="btn-secondary px-3 py-1.5" onClick={() => setOpen(true)}>{label}</button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="font-semibold">{label}</div>
+          <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo (ex.: cliquei na reserva errada)" maxLength={300} autoFocus />
+          <FormMessage error={state.error} />
+          <div className="flex gap-2">
+            <button className="btn bg-zinc-900 text-white" disabled={pending || reason.trim().length < 5} onClick={() => run(() => action(reason), () => onDone("Feito. Ficou registrado no histórico."))}>
+              Confirmar
+            </button>
+            <button className="btn-secondary" onClick={() => setOpen(false)}>Voltar</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

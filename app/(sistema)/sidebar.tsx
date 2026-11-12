@@ -17,8 +17,10 @@ export function Sidebar({
   userName,
   roleLabel,
   logout,
+  hotelName,
 }: {
   items: NavItem[];
+  hotelName: string;
   userName: string;
   roleLabel: string;
   logout: () => Promise<void>;
@@ -34,7 +36,7 @@ export function Sidebar({
       <div className="flex items-center justify-between px-4 py-3 md:py-5">
         <Link href="/mapa" className="flex items-center gap-2" onClick={() => setOpen(false)}>
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-lg font-black">H</span>
-          <span className="font-bold">Sistema do Hotel</span>
+          <span className="truncate font-bold">{hotelName}</span>
         </Link>
         <button
           type="button"

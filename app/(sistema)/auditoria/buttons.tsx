@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelAction } from "../reservas/actions";
-import { runAuditAction } from "./actions";
+import { runAuditAction, undoAuditAction } from "./actions";
 
 export function RunAuditButton({ disabled, next }: { disabled: boolean; next: string }) {
   const router = useRouter();
@@ -51,5 +51,48 @@ export function NoShowButton({ reservationId }: { reservationId: string }) {
     >
       Não compareceu
     </button>
+  );
+}
+
+export function UndoAuditButton({ date }: { date: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
+  return (
+    <div className="rounded-xl border border-dashed border-zinc-300 p-3 text-sm">
+      {!open ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-zinc-600">
+            Rodou a auditoria por engano (ou duas vezes)? Desfazer estorna as diárias que ela lançou e volta a data do sistema para {date}.
+          </span>
+          <button className="btn-secondary px-3 py-1.5" onClick={() => setOpen(true)}>↶ Desfazer a auditoria de {date}</button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo (ex.: rodei antes da última chegada)" maxLength={300} autoFocus />
+          <div className="flex gap-2">
+            <button
+              className="btn bg-zinc-900 text-white"
+              disabled={pending || reason.trim().length < 5}
+              onClick={() =>
+                start(async () => {
+                  const r = await undoAuditAction(reason);
+                  setMsg(r.ok ? { ok: r.message } : { error: r.error });
+                  if (r.ok) setOpen(false);
+                  router.refresh();
+                })
+              }
+            >
+              {pending ? "Desfazendo..." : "Confirmar"}
+            </button>
+            <button className="btn-secondary" onClick={() => setOpen(false)}>Voltar</button>
+          </div>
+        </div>
+      )}
+      {msg.ok && <p className="mt-2 text-emerald-700">✓ {msg.ok}</p>}
+      {msg.error && <p className="mt-2 text-red-700">{msg.error}</p>}
+    </div>
   );
 }

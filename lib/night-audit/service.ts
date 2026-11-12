@@ -5,7 +5,7 @@ import { can } from "@/lib/permissions";
 import { addDays, formatDate, fromDateStr, localToday, toDateStr, type DateStr } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
 import { getBusinessDate } from "@/lib/hotel-date";
-import { postNights, previewNights } from "@/lib/folio/service";
+import { postNights, previewNights, reverseRaw } from "@/lib/folio/service";
 
 // ================================================================
 // AUDITORIA NOTURNA
@@ -37,7 +37,7 @@ export async function auditChecklist(db: Db) {
     }),
     db.comanda.findMany({ where: { status: "ABERTA" }, select: { id: true, number: true, table: { select: { name: true } } } }),
     db.reservation.findMany({ where: { status: "HOSPEDADA" }, select: { id: true } }),
-    db.auditRun.findFirst({ orderBy: { businessDate: "desc" }, select: { businessDate: true, finishedAt: true, user: { select: { fullName: true } } } }),
+    db.auditRun.findFirst({ where: { undoneAt: null }, orderBy: { businessDate: "desc" }, select: { businessDate: true, finishedAt: true, user: { select: { fullName: true } } } }),
   ]);
 
   // Prévia do que a auditoria vai lançar (noite de hoje + atrasadas).
@@ -91,7 +91,7 @@ export async function runAudit(db: Db, actor: SessionUser): Promise<({ ok: true;
 
   const today = check.today;
   const day = fromDateStr(today);
-  if (await db.auditRun.findUnique({ where: { businessDate: day }, select: { id: true } })) {
+  if (await db.auditRun.findFirst({ where: { businessDate: day, undoneAt: null }, select: { id: true } })) {
     return { ok: false, error: "Este dia já foi auditado." };
   }
 
@@ -102,7 +102,7 @@ export async function runAudit(db: Db, actor: SessionUser): Promise<({ ok: true;
   let nights = 0;
   let total = 0;
   for (const r of inHouse) {
-    const posted = await postNights(db, actor, r.id, check.next);
+    const posted = await postNights(db, actor, r.id, check.next, { auditRunId: run.id });
     nights += posted.nights.length;
     total += posted.total;
     if (posted.nights.length) {
@@ -147,7 +147,7 @@ export async function runAudit(db: Db, actor: SessionUser): Promise<({ ok: true;
 
 export async function auditHistory(db: Db, take = 30) {
   const rows = await db.auditRun.findMany({
-    orderBy: { businessDate: "desc" },
+    orderBy: [{ businessDate: "desc" }, { startedAt: "desc" }],
     take,
     select: {
       id: true,
@@ -161,8 +161,90 @@ export async function auditHistory(db: Db, take = 30) {
       lodgingCents: true,
       revenueCents: true,
       receivedCents: true,
+      undoneAt: true,
+      undoReason: true,
       user: { select: { fullName: true } },
+      undoneBy: { select: { fullName: true } },
     },
   });
-  return rows.map((r) => ({ ...r, businessDate: toDateStr(r.businessDate), finishedAt: r.finishedAt?.toISOString() ?? null, by: r.user?.fullName ?? "Sistema" }));
+  return rows.map((r) => ({
+    ...r,
+    businessDate: toDateStr(r.businessDate),
+    finishedAt: r.finishedAt?.toISOString() ?? null,
+    undoneAt: r.undoneAt?.toISOString() ?? null,
+    undoneByName: r.undoneBy?.fullName ?? null,
+    by: r.user?.fullName ?? "Sistema",
+  }));
+}
+
+// ----------------------------------------------------------------
+// DESFAZER A ÚLTIMA AUDITORIA
+// ----------------------------------------------------------------
+//
+// Para o caso "rodei a auditoria por engano" (ou duas vezes): estorna as
+// diárias que ELA lançou, volta a data do sistema e marca a auditoria
+// como desfeita (fica no histórico, riscada). Depois o dia pode ser
+// auditado de novo. Só a última, e só enquanto a data não andou.
+
+export async function undoLastAudit(db: Db, actor: SessionUser, reason: unknown): Promise<({ ok: true; date: DateStr; reversed: number }) | Failure> {
+  if (!can(actor.role, "undo")) return { ok: false, error: "Só gerente ou administrador pode desfazer a auditoria." };
+  const why = typeof reason === "string" ? reason.trim() : "";
+  if (why.length < 5) return { ok: false, error: "Explique por que a auditoria está sendo desfeita." };
+
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('night-audit'))`;
+
+  const today = await getBusinessDate(db);
+  const run = await db.auditRun.findFirst({
+    where: { undoneAt: null },
+    orderBy: { businessDate: "desc" },
+    select: { id: true, businessDate: true, nextDate: true },
+  });
+  if (!run) return { ok: false, error: "Não há auditoria para desfazer." };
+  if (toDateStr(run.nextDate) !== today) {
+    return { ok: false, error: "A data do sistema já mudou depois desta auditoria; ela não pode mais ser desfeita por aqui." };
+  }
+
+  const entries = await db.folioEntry.findMany({
+    where: { auditRunId: run.id, reversalOfId: null, reversedAt: null },
+    select: { id: true, reservationId: true, reservation: { select: { status: true, number: true, guest: { select: { fullName: true } } } } },
+  });
+  const closed = entries.find((e) => e.reservation.status !== "HOSPEDADA");
+  if (closed) {
+    return {
+      ok: false,
+      error: `${closed.reservation.guest.fullName} (reserva nº ${closed.reservation.number}) já fez check-out depois da auditoria. Desfaça esse check-out primeiro.`,
+    };
+  }
+
+  // Check-in feito depois da auditoria tem entrada na data nova: voltaria
+  // a ser "futuro". Pede para desfazer esse check-in primeiro.
+  const lateArrival = await db.reservation.findFirst({
+    where: { status: "HOSPEDADA", checkIn: run.nextDate },
+    select: { number: true, guest: { select: { fullName: true } } },
+  });
+  if (lateArrival) {
+    return {
+      ok: false,
+      error: `${lateArrival.guest.fullName} (reserva nº ${lateArrival.number}) fez check-in depois da auditoria. Desfaça esse check-in primeiro.`,
+    };
+  }
+
+  const closedDay = toDateStr(run.businessDate);
+  // Volta a data ANTES de estornar: o estorno entra no dia que está sendo reaberto.
+  await db.setting.upsert({ where: { key: "businessDate" }, create: { key: "businessDate", value: closedDay }, update: { value: closedDay } });
+
+  const touched = new Set<string>();
+  for (const e of entries) {
+    await reverseRaw(db, actor.id, e.id, `Auditoria de ${formatDate(closedDay)} desfeita: ${why}`);
+    touched.add(e.reservationId);
+  }
+  for (const reservationId of touched) {
+    await db.reservationEvent.create({
+      data: { reservationId, userId: actor.id, type: "estorno", message: `Auditoria de ${formatDate(closedDay)} desfeita: diárias dela estornadas` },
+    });
+  }
+
+  await db.auditRun.update({ where: { id: run.id }, data: { undoneAt: new Date(), undoneById: actor.id, undoReason: why } });
+  await audit(db, "audit.undo", { userId: actor.id, metadata: { date: closedDay, reversed: entries.length, reason: why } });
+  return { ok: true, date: closedDay, reversed: entries.length };
 }

@@ -1,4 +1,6 @@
 import { verifySession } from "@/lib/auth/dal";
+import { getDb } from "@/lib/db";
+import { getHotelSettings } from "@/lib/settings";
 import { can, ROLE_LABEL } from "@/lib/permissions";
 import { logoutAction } from "@/app/entrar/actions";
 import { Sidebar, type NavItem } from "./sidebar";
@@ -23,6 +25,7 @@ function navFor(role: Parameters<typeof can>[0]): NavItem[] {
     ...(can(role, "minibar.post") ? [{ href: "/frigobar", label: "Frigobar", icon: "🧃" }] : []),
     ...(can(role, "audit.run") ? [{ href: "/auditoria", label: "Auditoria noturna", icon: "🌙" }] : []),
     { href: "/relatorios", label: "Relatórios", icon: "📊" },
+    ...(can(role, "settings.manage") ? [{ href: "/configuracoes", label: "Configurações", icon: "⚙️", group: "Administração" }] : []),
     ...(can(role, "rooms.manage") ? [{ href: "/quartos", label: "Cadastro de quartos", icon: "🏨", group: "Administração" }] : []),
     ...(can(role, "menu.manage") ? [{ href: "/cardapio", label: "Cardápio e mesas", icon: "📋", group: "Administração" }] : []),
     ...(can(role, "rates.manage") ? [{ href: "/tarifas", label: "Tarifas", icon: "💲", group: "Administração" }] : []),
@@ -32,10 +35,12 @@ function navFor(role: Parameters<typeof can>[0]): NavItem[] {
 
 export default async function SistemaLayout({ children }: { children: React.ReactNode }) {
   const { user } = await verifySession();
+  const { hotelName } = await getHotelSettings(getDb());
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar
+        hotelName={hotelName}
         items={navFor(user.role)}
         userName={user.fullName}
         roleLabel={ROLE_LABEL[user.role]}

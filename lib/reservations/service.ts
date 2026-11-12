@@ -869,3 +869,103 @@ export async function readyRooms(db: Db, from: DateStr, to: DateStr, reservation
     .map((r) => ({ id: r.id, number: r.number, floor: r.floor, roomTypeId: r.roomTypeId, typeName: r.roomType.name, problem: r.maintenance === "COM_PROBLEMA" }))
     .sort((a, b) => a.number.localeCompare(b.number, "pt-BR", { numeric: true }));
 }
+
+// ----------------------------------------------------------------
+// DESFAZER (gerente / administrador)
+// ----------------------------------------------------------------
+//
+// Para corrigir cliques errados sem mexer no banco. Cada um deixa
+// registro no histórico da reserva e no registro de ações.
+
+function undoDenied(actor: SessionUser): Failure | null {
+  return can(actor.role, "undo") ? null : { ok: false, error: "Só gerente ou administrador pode desfazer." };
+}
+
+function undoReason(reason: unknown): string | null {
+  const r = typeof reason === "string" ? reason.trim() : "";
+  return r.length >= 5 ? r.slice(0, 300) : null;
+}
+
+// Check-in feito por engano (quarto errado, hóspede errado...): a reserva
+// volta a "confirmada" e o quarto volta a ficar livre.
+export async function undoCheckIn(db: Db, actor: SessionUser, id: string, reason: unknown): Promise<Result<Rooms>> {
+  const no = undoDenied(actor);
+  if (no) return no;
+  const why = undoReason(reason);
+  if (!why) return { ok: false, error: "Explique o motivo (pelo menos 5 letras)." };
+
+  const r = await db.reservation.findUnique({
+    where: { id },
+    select: { status: true, roomId: true, room: { select: { number: true } }, folio: { where: { reversalOfId: null, reversedAt: null }, select: { id: true } } },
+  });
+  if (!r || r.status !== "HOSPEDADA" || !r.roomId) return { ok: false, error: "Esta reserva não está hospedada." };
+  if (r.folio.length > 0) {
+    return { ok: false, error: "A conta já tem lançamentos. Estorne-os primeiro (ou desfaça a auditoria que lançou as diárias)." };
+  }
+  if (await db.comanda.findFirst({ where: { reservationId: id, status: "ABERTA" }, select: { id: true } })) {
+    return { ok: false, error: "O hóspede tem comanda aberta no restaurante." };
+  }
+
+  await db.reservation.update({ where: { id }, data: { status: "CONFIRMADA", checkedInAt: null } });
+  await db.vehicle.updateMany({ where: { reservationId: id, exitedAt: null }, data: { exitedAt: new Date() } });
+  const room = await applyRoomChanges(db, actor, r.roomId, { occupancy: "LIVRE" });
+  await event(db, id, actor.id, "desfeito", `Check-in desfeito (quarto ${r.room?.number}): ${why}`);
+  await audit(db, "undo.checkin", { userId: actor.id, metadata: { id, reason: why } });
+  return { ok: true, rooms: [room] };
+}
+
+// Check-out feito por engano: o hóspede volta para o quarto (se ele
+// ainda estiver livre). A saída passa a ser amanhã, se já tinha passado.
+export async function undoCheckOut(db: Db, actor: SessionUser, id: string, reason: unknown): Promise<Result<Rooms>> {
+  const no = undoDenied(actor);
+  if (no) return no;
+  const why = undoReason(reason);
+  if (!why) return { ok: false, error: "Explique o motivo (pelo menos 5 letras)." };
+
+  const r = await db.reservation.findUnique({
+    where: { id },
+    select: { status: true, roomId: true, roomTypeId: true, checkIn: true, checkOut: true, room: { select: { number: true, occupancy: true } } },
+  });
+  if (!r || r.status !== "FINALIZADA" || !r.roomId || !r.room) return { ok: false, error: "Esta reserva não está com check-out feito." };
+  if (r.room.occupancy === "OCUPADO") return { ok: false, error: `O quarto ${r.room.number} já está ocupado por outro hóspede. Faça um check-in novo em outro quarto.` };
+
+  const today = await getBusinessDate(db);
+  const checkOut = toDateStr(r.checkOut) > today ? toDateStr(r.checkOut) : addDays(today, 1);
+  const check = await checkRoomForStay(db, r.roomId, today, checkOut, id);
+  if ("error" in check) return { ok: false, error: check.error! };
+  const busy = await ensureAvailable(db, r.roomTypeId, today, checkOut, id);
+  if (busy) return { ok: false, error: busy };
+
+  try {
+    await db.reservation.update({ where: { id }, data: { status: "HOSPEDADA", checkedOutAt: null, checkOut: fromDateStr(checkOut) } });
+  } catch (error) {
+    const msg = overlapError(error);
+    if (msg) return { ok: false, error: msg };
+    throw error;
+  }
+  const room = await applyRoomChanges(db, actor, r.roomId, { occupancy: "OCUPADO" });
+  await event(db, id, actor.id, "desfeito", `Check-out desfeito: hóspede de volta ao quarto ${r.room.number}, saída ${checkOut.split("-").reverse().join("/")}. ${why}`);
+  await audit(db, "undo.checkout", { userId: actor.id, metadata: { id, reason: why } });
+  return { ok: true, rooms: [room] };
+}
+
+// Reserva cancelada ou marcada "não compareceu" por engano: volta a
+// confirmada (se as datas ainda servem e há quarto do tipo).
+export async function reactivateReservation(db: Db, actor: SessionUser, id: string, reason: unknown): Promise<Result> {
+  const no = undoDenied(actor);
+  if (no) return no;
+  const why = undoReason(reason);
+  if (!why) return { ok: false, error: "Explique o motivo (pelo menos 5 letras)." };
+
+  const r = await db.reservation.findUnique({ where: { id }, select: { status: true, checkIn: true, checkOut: true, roomTypeId: true } });
+  if (!r || (r.status !== "CANCELADA" && r.status !== "NO_SHOW")) return { ok: false, error: "Só reservas canceladas ou de não comparecimento podem ser reativadas." };
+  const today = await getBusinessDate(db);
+  if (toDateStr(r.checkOut) <= today) return { ok: false, error: "A data de saída já passou. Faça uma reserva nova." };
+  const busy = await ensureAvailable(db, r.roomTypeId, toDateStr(r.checkIn) < today ? today : toDateStr(r.checkIn), toDateStr(r.checkOut), id);
+  if (busy) return { ok: false, error: busy };
+
+  await db.reservation.update({ where: { id }, data: { status: "CONFIRMADA", cancelReason: null } });
+  await event(db, id, actor.id, "reativada", why);
+  await audit(db, "undo.reactivate", { userId: actor.id, metadata: { id, reason: why } });
+  return { ok: true };
+}
