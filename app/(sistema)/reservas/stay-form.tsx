@@ -11,7 +11,7 @@ import type { Availability } from "@/lib/reservations/service";
 import { addDays, formatDate, nightsBetween, type DateStr } from "@/lib/dates";
 import { centsToInput, formatBRL, parseBRL } from "@/lib/money";
 import { computeTotals, SOURCE_LABEL, SOURCES, type Source } from "@/lib/reservations/rules";
-import { CompanionsFields, GuestFields, readCompanions, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "./guest-fields";
+import { checkGuestForms, CompanionsFields, GuestFields, readCompanions, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "./guest-fields";
 import {
   availabilityAction,
   createReservationAction,
@@ -67,6 +67,7 @@ export function StayForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, start] = useTransition();
   const [errors, setErrors] = useState<{ error?: string; fieldErrors?: FieldErrors }>({});
+  const [problems, setProblems] = useState<string[]>([]);
 
   const defaultPlan = plans.find((p) => p.id === initial.ratePlanId) ?? (mode === "editar" ? undefined : plans[0]);
   const [checkIn, setCheckIn] = useState(initial.checkIn);
@@ -193,8 +194,18 @@ export function StayForm({
     <form
       ref={formRef}
       className="space-y-4"
+      noValidate={mode === "direto"}
       onSubmit={(e) => {
         e.preventDefault();
+        // Entrada direta = check-in: confere as fichas e diz o que falta.
+        if (mode === "direto") {
+          const list = checkGuestForms(formRef.current!, tr, adults + children);
+          setProblems(list);
+          if (list.length) {
+            formRef.current!.querySelector("[aria-invalid=true]")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
+        }
         submit();
       }}
     >
@@ -418,6 +429,14 @@ export function StayForm({
         </>
       )}
 
+      {problems.length > 0 && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="font-semibold">{tr("Ainda não dá para fazer o check-in:")}</div>
+          <ul className="mt-1 list-disc pl-5">
+            {problems.map((p) => <li key={p}>{p}</li>)}
+          </ul>
+        </div>
+      )}
       <FormMessage error={errors.error} />
       {missing.length > 0 && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{tr("Para continuar: {0}.", [missing.join(" · ")])}</p>

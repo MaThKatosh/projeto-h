@@ -13,7 +13,7 @@ import { formatDate, nightsBetween, weekday, type DateStr } from "@/lib/dates";
 import { formatBRL, formatPercent } from "@/lib/money";
 import { SOURCE_LABEL, STATUS } from "@/lib/reservations/rules";
 import { effectiveCheckOut } from "@/lib/folio/rules";
-import { CompanionsFields, GuestFields, readCompanions, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "../guest-fields";
+import { checkGuestForms, CompanionsFields, GuestFields, readCompanions, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "../guest-fields";
 import { missingFnrh, PURPOSE_LABEL, TRANSPORT_LABEL } from "@/lib/guests/fnrh";
 import { StayForm } from "../stay-form";
 import type { FolioView } from "@/lib/folio/service";
@@ -384,15 +384,28 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
   const { pending, state, run } = useAction();
   const assignedNotReady = rooms && r.roomId && !rooms.some((x) => x.id === r.roomId);
   const effectiveRoom = assignedNotReady && roomId === r.roomId ? "" : roomId;
+  // O que impede o check-in, dito com todas as letras (antes o botão só ficava apagado).
+  const [problems, setProblems] = useState<string[]>([]);
 
   return (
     <Box title={tr("Check-in — {0}", [r.guest.fullName])} onClose={onClose}>
       <form
         ref={formRef}
+        noValidate
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
           const form = formRef.current!;
+          const list = [
+            ...(r.checkIn > today ? [tr("A reserva é para {0}. Altere a entrada para hoje antes do check-in.", [formatDate(r.checkIn)])] : []),
+            ...(effectiveRoom ? [] : [tr("Escolha o quarto (passo 1).")]),
+            ...checkGuestForms(form, tr, r.adults + r.children),
+          ];
+          setProblems(list);
+          if (list.length) {
+            form.querySelector("[aria-invalid=true]")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
           run(
             () => checkInAction(r.id, { roomId: effectiveRoom, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form), companions: readCompanions(form) }),
             () => onDone("Check-in feito. Bem-vindo!")
@@ -426,8 +439,16 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
           <h3 className="mb-2 text-sm font-semibold">{tr("4. Veículo (opcional)")}</h3>
           <VehicleFields errors={state.fieldErrors} />
         </div>
+        {problems.length > 0 && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className="font-semibold">{tr("Ainda não dá para fazer o check-in:")}</div>
+            <ul className="mt-1 list-disc pl-5">
+              {problems.map((p) => <li key={p}>{p}</li>)}
+            </ul>
+          </div>
+        )}
         <FormMessage error={state.error} />
-        <button type="submit" className="btn bg-emerald-600 px-6 py-3 text-white hover:bg-emerald-700" disabled={pending || !effectiveRoom}>
+        <button type="submit" className="btn bg-emerald-600 px-6 py-3 text-white hover:bg-emerald-700" disabled={pending}>
           {pending ? tr("Fazendo check-in...") : tr("Confirmar check-in")}
         </button>
       </form>

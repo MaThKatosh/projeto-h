@@ -68,3 +68,9 @@ body {
     break-inside: avoid;
   }
 }
+
+/* Campo que falta preencher (destacado ao tentar confirmar). */
+.field[aria-invalid="true"] {
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}

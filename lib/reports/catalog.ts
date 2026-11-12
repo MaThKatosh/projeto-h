@@ -664,6 +664,90 @@ export const REPORTS: ReportDef[] = [
 
   // ------------------------------------------------------------ GOVERNANÇA E MANUTENÇÃO
   {
+    slug: "saidas-governanca",
+    title: "Saídas do dia (governança)",
+    description: "Para a governança planejar a arrumação: quartos com saída no dia, se o hóspede já saiu, quantas pessoas e a situação da limpeza.",
+    group: "Governança e manutenção",
+    roles: ["ADMIN", "GERENTE", "RECEPCAO", "GOVERNANCA"],
+    period: "day",
+    defaultPeriod: "today",
+    async run(db, p) {
+      const day = fromDateStr(p.from);
+      const rows = await db.reservation.findMany({
+        where: {
+          OR: [
+            // previstas para sair no dia (ainda na casa ou já saíram)
+            { checkOut: day, status: { in: ["HOSPEDADA", "FINALIZADA"] } },
+            // saíram no dia antes do previsto (saída antecipada) ou atrasados
+            { status: "FINALIZADA", checkedOutAt: { gte: localStart(p.from), lt: localStart(addDays(p.from, 1)) } },
+            ...(p.from === p.today ? [{ status: "HOSPEDADA" as const, checkOut: { lt: day } }] : []),
+          ],
+        },
+        select: {
+          status: true,
+          checkOut: true,
+          checkedOutAt: true,
+          adults: true,
+          children: true,
+          guest: { select: { fullName: true } },
+          room: {
+            select: {
+              number: true,
+              floor: true,
+              housekeeping: true,
+              roomType: { select: { name: true } },
+              cleanings: { where: { status: { in: ["PENDENTE", "EM_ANDAMENTO"] } }, take: 1, select: { status: true, priority: true, assignedTo: { select: { fullName: true } } } },
+            },
+          },
+        },
+      });
+      const HK: Record<string, string> = { LIMPO: "limpo", SUJO: "sujo", EM_ARRUMACAO: "em arrumação" };
+      const seen = new Set<string>();
+      const data = rows
+        .filter((r) => r.room && !seen.has(r.room.number) && seen.add(r.room.number))
+        .map((r) => {
+          const out = r.status === "FINALIZADA";
+          const late = !out && toDateStr(r.checkOut) < p.from;
+          const task = r.room!.cleanings[0];
+          return {
+            quarto: r.room!.number,
+            andar: r.room!.floor,
+            tipo: r.room!.roomType.name,
+            situacao: out ? "já saiu" : late ? "saída atrasada" : "ainda no quarto",
+            saiu: r.checkedOutAt ? r.checkedOutAt.toISOString() : null,
+            hospede: r.guest.fullName,
+            pessoas: r.adults + r.children,
+            limpeza: HK[r.room!.housekeeping] ?? r.room!.housekeeping,
+            responsavel: task?.assignedTo?.fullName ?? null,
+            prioridade: task?.priority ? "sim" : null,
+          };
+        })
+        .sort((a, b) => a.quarto.localeCompare(b.quarto, "pt-BR", { numeric: true }));
+      const left = data.filter((d) => d.situacao === "já saiu").length;
+      return {
+        columns: [
+          { key: "quarto", label: "Quarto" },
+          { key: "andar", label: "Andar", type: "int" },
+          { key: "tipo", label: "Tipo" },
+          { key: "situacao", label: "Situação" },
+          { key: "saiu", label: "Saiu às", type: "datetime" },
+          { key: "hospede", label: "Hóspede" },
+          { key: "pessoas", label: "Pessoas", type: "int", total: true },
+          { key: "limpeza", label: "Limpeza" },
+          { key: "responsavel", label: "Responsável" },
+          { key: "prioridade", label: "Prioridade" },
+        ],
+        rows: data,
+        summary: [
+          { label: "Saídas do dia", value: String(data.length) },
+          { label: "Já saíram", value: String(left) },
+          { label: "Ainda no quarto", value: String(data.length - left) },
+        ],
+        note: "Quartos que já saíram vão para a governança como sujos. Imprima de manhã e confira de novo à tarde.",
+      };
+    },
+  },
+  {
     slug: "arrumacoes",
     title: "Arrumações por camareira",
     description: "Quartos arrumados no período por pessoa, com tempo médio.",

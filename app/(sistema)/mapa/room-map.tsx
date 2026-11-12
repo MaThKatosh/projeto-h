@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Door } from "@/components/door";
 import { useRouter } from "next/navigation";
 import { useHotelEvents } from "@/components/use-hotel-events";
 import type { Role } from "@/lib/permissions";
@@ -170,7 +171,7 @@ export function RoomMap({
                 <h2 className="mb-2 text-sm font-semibold tracking-wide text-zinc-500 uppercase">
                   {f === 0 ? tr("Térreo") : tr("{0}º andar", [f])}
                 </h2>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3">
                   {list.map((room) => (
                     <RoomCard
                       key={room.id}
@@ -224,37 +225,32 @@ function RoomCard({
   const d = DISPLAY[status];
   const extra = badges(room);
 
+  // Cor da porta: as classes de fundo/texto da situação (sem a borda).
+  const color = d.card.split(" ").filter((c) => !c.startsWith("border")).join(" ");
+
   return (
     <button
       type="button"
       onClick={onClick}
       title={room.note ?? undefined}
-      className={`relative flex min-h-24 flex-col rounded-xl border-b-4 p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${d.card} ${
-        flashing ? "ring-4 ring-blue-400 ring-offset-2" : ""
-      }`}
+      className="group flex flex-col items-stretch rounded-xl p-1.5 text-center transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
     >
-      <span className="flex items-start justify-between">
-        <span className="text-xl leading-none font-black">{room.number}</span>
-        <span className="text-sm" aria-hidden>{d.icon}</span>
-      </span>
-      <span className="mt-1 truncate text-[11px] opacity-90">{room.typeName}</span>
+      <Door number={room.number} colorClass={color} icon={d.icon} ring={flashing} />
+      <span className="mt-1.5 truncate text-[11px] text-zinc-500">{room.typeName}</span>
       {occupant && !occupant.arriving && room.occupancy === "OCUPADO" ? (
-        <span className="mt-auto truncate text-xs font-semibold" title={occupant.guestName}>
+        <span className="truncate text-xs font-semibold text-zinc-800" title={occupant.guestName}>
           {lastName(occupant.guestName)} · {occupant.checkOut <= today ? <b className="rounded bg-amber-300 px-1 text-amber-950">{tr("sai hoje")}</b> : tr("sai {0}", [formatDate(occupant.checkOut)])}
         </span>
       ) : (
-        <span className="mt-auto text-xs font-semibold">{tr(d.label)}</span>
+        <span className="text-xs font-semibold text-zinc-700">{tr(d.label)}</span>
       )}
       {occupant?.arriving && (
-        <span className="mt-1 truncate rounded bg-sky-100 px-1 py-px text-[10px] font-bold text-sky-800" title={occupant.guestName}>{tr("➜ chega hoje: {0}", [lastName(occupant.guestName)])}</span>
+        <span className="mt-0.5 truncate rounded bg-sky-100 px-1 py-px text-[10px] font-bold text-sky-800" title={occupant.guestName}>{tr("➜ chega hoje: {0}", [lastName(occupant.guestName)])}</span>
       )}
       {extra.length > 0 && (
-        <span className="mt-1 flex flex-wrap gap-1">
+        <span className="mt-0.5 flex flex-wrap justify-center gap-1">
           {extra.map((b) => (
-            <span
-              key={b}
-              className={`rounded px-1 py-px text-[10px] font-bold ${b.startsWith("⚠") ? "bg-red-100 text-red-700" : "bg-white/80 text-zinc-800"}`}
-            >
+            <span key={b} className={`rounded px-1 py-px text-[10px] font-bold ${b.startsWith("⚠") ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-700"}`}>
               {tr(b)}
             </span>
           ))}

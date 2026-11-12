@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Door } from "@/components/door";
 import { useState, useTransition } from "react";
 import { LiveDot, useLiveRefresh } from "@/components/live-refresh";
 import { useNow } from "@/components/use-now";
@@ -45,6 +46,7 @@ export function HousekeepingBoard({
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{tr("Governança")}</h1>
+          <Link href="/relatorios/saidas-governanca" className="text-sm text-blue-700 underline">{tr("📋 Saídas do dia")}</Link>
           <LiveDot connected={connected} />
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
@@ -146,9 +148,12 @@ function TaskCard({
   return (
     <div className={`card p-3 ${card.priority || card.arrivingToday ? "border-2 border-blue-500" : ""} ${pending ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-3xl leading-none font-black">{card.room.number}</span>
+        <div className="w-14 shrink-0">
+          <Door number={card.room.number} colorClass={doing ? "bg-orange-500 text-white" : "bg-amber-300 text-amber-950"} icon={doing ? "⟳" : "✦"} size="sm" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-base leading-none font-black whitespace-nowrap">{tr("Quarto {0}", [card.room.number])}</span>
             {card.priority && <span className="rounded bg-blue-600 px-1.5 py-0.5 text-xs font-bold text-white">{tr("★ Prioridade")}</span>}
             {card.arrivingToday && <span className="rounded bg-sky-600 px-1.5 py-0.5 text-xs font-bold text-white">{tr("➜ Chega hoje")}</span>}
           </div>

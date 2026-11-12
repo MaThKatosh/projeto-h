@@ -8,6 +8,7 @@ import { GENDERS, GENDER_LABEL, PURPOSE_LABEL, TRANSPORT_LABEL, TRANSPORTS, TRAV
 import { useRef, useState } from "react";
 import { useLocale, useT } from "@/components/i18n";
 import { countryOptions } from "@/lib/guests/countries";
+import { birthDateProblem, isValidCpf, normalizeCep } from "@/lib/guests/validate";
 
 // Dados que costumam ser iguais para a família toda.
 const SHARED = ["phone", "email", "address", "zipCode", "city", "state", "country"] as const;
@@ -294,4 +295,40 @@ export function readCompanions(form: HTMLFormElement) {
     out.push(id ? { ...g, id } : g);
   }
   return out;
+}
+
+// Confere as fichas no próprio navegador antes de enviar: devolve a lista do
+// que falta (em texto claro) e marca os campos em vermelho.
+// people: fichas exigidas; fichas extras deixadas em branco são ignoradas.
+export function checkGuestForms(form: HTMLFormElement, tr: (s: string, p?: unknown[]) => string, people = 1): string[] {
+  const problems: string[] = [];
+  const prefixes = ["g_"];
+  for (let i = 0; form.elements.namedItem(`c${i}_fullName`); i++) prefixes.push(`c${i}_`);
+  form.querySelectorAll("[aria-invalid=true]").forEach((el) => el.removeAttribute("aria-invalid"));
+  for (const p of prefixes) {
+    const el = (k: string) => form.elements.namedItem(`${p}${k}`) as HTMLInputElement | HTMLSelectElement | null;
+    const val = (k: string) => (el(k)?.value ?? "").trim();
+    const miss: string[] = [];
+    if (p !== "g_" && Number(p.slice(1, -1)) >= people - 1 && !val("fullName") && !val("docNumber")) continue;
+    const mark = (k: string, label: string) => {
+      el(k)?.setAttribute("aria-invalid", "true");
+      miss.push(tr(label));
+    };
+    if (val("fullName").split(/\s+/).filter(Boolean).length < 2) mark("fullName", "nome e sobrenome");
+    if (!val("docNumber")) mark("docNumber", "documento");
+    else if (val("docType") === "CPF" && !isValidCpf(val("docNumber"))) mark("docNumber", "CPF válido");
+    if (!val("birthDate")) mark("birthDate", "nascimento");
+    else if (birthDateProblem(val("birthDate"))) mark("birthDate", "data de nascimento válida");
+    if (!val("nationality")) mark("nationality", "nacionalidade");
+    if (!val("gender")) mark("gender", "sexo");
+    if (!val("country")) mark("country", "país de residência");
+    if (!val("city")) mark("city", "cidade");
+    if (/^brasil$/i.test(val("country")) && !val("state")) mark("state", "estado");
+    if (val("zipCode") && /^brasil$/i.test(val("country")) && !normalizeCep(val("zipCode"))) mark("zipCode", "CEP válido");
+    if (miss.length) {
+      const who = p === "g_" ? tr("Titular") : tr("Acompanhante {0}", [Number(p.slice(1, -1)) + 1]);
+      problems.push(tr("{0}: falta {1}.", [who, miss.join(", ")]));
+    }
+  }
+  return problems;
 }
