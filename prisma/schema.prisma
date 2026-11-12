@@ -1,0 +1,469 @@
+// Schema do Projeto H (sistema hoteleiro).
+// Migrations versionadas em prisma/migrations — nunca editar uma
+// migration já aplicada; criar uma nova.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ================================================================
+// USUÁRIOS E CARGOS (Fase 1)
+// ================================================================
+//
+// O que cada cargo pode fazer fica em lib/permissions.ts (código), não
+// no banco: assim a regra é testada e não muda sem querer.
+
+enum Role {
+  ADMIN       // Administrador: tudo, inclusive usuários
+  GERENTE     // Gerente: tudo da operação
+  RECEPCAO    // Recepção: hóspedes, reservas, contas
+  GOVERNANCA  // Governança: limpeza dos quartos
+  MANUTENCAO  // Manutenção: problemas e bloqueios
+  RESTAURANTE // Restaurante e frigobar
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  // Login por nome de usuário: nem todo funcionário tem e-mail.
+  username     String   @unique
+  fullName     String
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLoginAt  DateTime?
+
+  sessions      AuthSession[]
+  auditLogs     AuditLog[]
+  roomChanges   RoomStatusLog[]
+
+  cleaningAssigned  CleaningTask[]      @relation("CleaningAssigned")
+  cleaningFinished  CleaningTask[]      @relation("CleaningFinished")
+  ticketsReported   MaintenanceTicket[] @relation("TicketReporter")
+  ticketsAssigned   MaintenanceTicket[] @relation("TicketAssignee")
+  ticketEvents      TicketEvent[]
+
+  reservationsCreated Reservation[]      @relation("ReservationCreator")
+  reservationEvents   ReservationEvent[]
+  roomMoves           RoomMove[]
+}
+
+model AuthSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  // O cookie leva o token; aqui fica só o hash dele.
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime  @default(now())
+  userAgent  String?
+  ipAddress  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Trilha de tudo que é sensível (login, usuários, cadastros). Base dos
+// relatórios de auditoria das fases seguintes.
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  ipAddress String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ================================================================
+// QUARTOS (Fase 1)
+// ================================================================
+//
+// Cada quarto tem TRÊS situações independentes, e cada setor mexe só na
+// sua. A cor do mapa é calculada a partir delas (lib/rooms/status.ts).
+
+enum Occupancy {
+  LIVRE
+  OCUPADO
+}
+
+enum Housekeeping {
+  LIMPO
+  SUJO
+  EM_ARRUMACAO
+}
+
+enum Maintenance {
+  OK
+  COM_PROBLEMA
+  EM_MANUTENCAO
+  BLOQUEADO
+}
+
+model RoomType {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique // ex.: "Standard Casal"
+  capacity    Int     @default(2)
+  description String?
+
+  rooms        Room[]
+  prices       RatePrice[]
+  reservations Reservation[]
+}
+
+model Room {
+  id           String       @id @default(uuid()) @db.Uuid
+  number       String       @unique // "101", "204A"
+  floor        Int
+  roomTypeId   String       @db.Uuid
+  occupancy    Occupancy    @default(LIVRE)
+  housekeeping Housekeeping @default(LIMPO)
+  maintenance  Maintenance  @default(OK)
+  // Observação curta visível no mapa (ex.: "chuveiro pingando").
+  note         String?
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  roomType RoomType            @relation(fields: [roomTypeId], references: [id])
+  history  RoomStatusLog[]
+  cleanings CleaningTask[]
+  reservations Reservation[]
+  movesFrom    RoomMove[]   @relation("MoveFrom")
+  movesTo      RoomMove[]   @relation("MoveTo")
+  tickets   MaintenanceTicket[]
+
+  @@index([floor, number])
+}
+
+// Histórico de cada mudança de situação de um quarto (quem, quando, de
+// quê para quê). Alimenta os relatórios de governança e manutenção.
+model RoomStatusLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @db.Uuid
+  userId    String?  @db.Uuid
+  field     String   // "housekeeping" | "maintenance" | "occupancy" | "note"
+  fromValue String?
+  toValue   String?
+  createdAt DateTime @default(now())
+
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, createdAt])
+  @@index([createdAt])
+}
+
+// ================================================================
+// GOVERNANÇA (Fase 2)
+// ================================================================
+//
+// Toda vez que um quarto fica SUJO nasce uma tarefa de limpeza. Começar
+// a tarefa deixa o quarto EM_ARRUMACAO; terminar deixa LIMPO. A tarefa
+// guarda quem arrumou e quanto tempo levou (relatórios da Fase 6).
+// Regra garantida no banco: no máximo UMA tarefa aberta por quarto
+// (índice parcial criado na migration).
+
+enum CleaningStatus {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+model CleaningTask {
+  id           String         @id @default(uuid()) @db.Uuid
+  roomId       String         @db.Uuid
+  status       CleaningStatus @default(PENDENTE)
+  priority     Boolean        @default(false)
+  assignedToId String?        @db.Uuid
+  finishedById String?        @db.Uuid
+  createdAt    DateTime       @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
+
+  room       Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  assignedTo User? @relation("CleaningAssigned", fields: [assignedToId], references: [id], onDelete: SetNull)
+  finishedBy User? @relation("CleaningFinished", fields: [finishedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([finishedAt])
+  @@index([roomId, createdAt])
+}
+
+// ================================================================
+// MANUTENÇÃO (Fase 2)
+// ================================================================
+//
+// Ocorrência = um problema a resolver, num quarto ou numa área do hotel
+// (piscina, recepção...). A situação de manutenção do QUARTO é calculada
+// a partir das ocorrências abertas dele (lib/maintenance/rules.ts).
+
+enum TicketStatus {
+  ABERTA
+  EM_ANDAMENTO
+  AGUARDANDO // peça, terceiro, hóspede sair...
+  RESOLVIDA
+  CANCELADA
+}
+
+enum TicketPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+model MaintenanceTicket {
+  id           String         @id @default(uuid()) @db.Uuid
+  // Número curto para falar no rádio: "ocorrência 12".
+  number       Int            @unique @default(autoincrement())
+  roomId       String?        @db.Uuid
+  location     String?        // quando não é num quarto
+  title        String
+  description  String?
+  priority     TicketPriority @default(MEDIA)
+  status       TicketStatus   @default(ABERTA)
+  // Enquanto aberta, o quarto não pode ser vendido.
+  outOfOrder   Boolean        @default(false)
+  reportedById String?        @db.Uuid
+  assignedToId String?        @db.Uuid
+  resolution   String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  startedAt    DateTime?
+  closedAt     DateTime?
+
+  room       Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  reportedBy User?         @relation("TicketReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  assignedTo User?         @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  events     TicketEvent[]
+
+  @@index([status])
+  @@index([roomId, status])
+  @@index([closedAt])
+}
+
+// Linha do tempo da ocorrência (quem fez o quê e quando).
+model TicketEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  userId    String?  @db.Uuid
+  type      String   // criada | atribuida | iniciada | aguardando | resolvida | cancelada | reaberta | comentario | fora_de_venda
+  message   String?
+  createdAt DateTime @default(now())
+
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+}
+
+// ================================================================
+// CONFIGURAÇÕES DO HOTEL (Fase 3)
+// ================================================================
+//
+// Chave/valor. "businessDate" = DATA DO SISTEMA (data hoteleira): só
+// muda na auditoria noturna (Fase 6), não à meia-noite do relógio.
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ================================================================
+// HÓSPEDES, TARIFAS E RESERVAS (Fase 3)
+// ================================================================
+//
+// Dinheiro sempre em CENTAVOS (Int). Datas de estadia em @db.Date
+// (sem hora): entrada e saída; noites = saída - entrada.
+
+model Guest {
+  id          String    @id @default(uuid()) @db.Uuid
+  fullName    String
+  docType     String?   // CPF | RG | PASSAPORTE | OUTRO
+  docNumber   String?
+  phone       String?
+  email       String?
+  birthDate   DateTime? @db.Date
+  nationality String?
+  city        String?
+  state       String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  reservations Reservation[]
+  companionOf  ReservationGuest[]
+
+  @@index([fullName])
+  @@index([docNumber])
+}
+
+model RatePlan {
+  id                String  @id @default(uuid()) @db.Uuid
+  name              String  @unique // "Balcão", "Booking", "Corporativo X"
+  includesBreakfast Boolean @default(true)
+  // ISS sobre a diária: cobra ou não, e quanto (em centésimos de %: 500 = 5%).
+  chargeIss         Boolean @default(false)
+  issBasisPoints    Int     @default(500)
+  active            Boolean @default(true)
+
+  prices       RatePrice[]
+  reservations Reservation[]
+}
+
+model RatePrice {
+  ratePlanId String @db.Uuid
+  roomTypeId String @db.Uuid
+  dailyCents Int
+
+  ratePlan RatePlan @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@id([ratePlanId, roomTypeId])
+}
+
+enum ReservationStatus {
+  CONFIRMADA // ainda não chegou
+  HOSPEDADA  // fez check-in: está na casa
+  FINALIZADA // fez check-out
+  CANCELADA
+  NO_SHOW    // não apareceu
+}
+
+enum ReservationSource {
+  BALCAO
+  TELEFONE
+  EMAIL
+  WHATSAPP
+  SITE
+  BOOKING
+  HOTEIS_COM
+  EXPEDIA
+  DECOLAR
+  AIRBNB
+  AGENCIA
+  OUTRO
+}
+
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  number         Int               @unique @default(autoincrement())
+  status         ReservationStatus @default(CONFIRMADA)
+  guestId        String            @db.Uuid
+  roomTypeId     String            @db.Uuid
+  // Quarto escolhido. Obrigatório a partir do check-in.
+  roomId         String?           @db.Uuid
+  checkIn        DateTime          @db.Date
+  checkOut       DateTime          @db.Date
+  adults         Int               @default(1)
+  children       Int               @default(0)
+  ratePlanId     String?           @db.Uuid
+  // Valores combinados (copiados da tarifa, podem ser alterados).
+  dailyCents     Int
+  breakfast      Boolean           @default(true)
+  chargeIss      Boolean           @default(false)
+  issBasisPoints Int               @default(0)
+  source         ReservationSource @default(BALCAO)
+  externalCode   String?           // nº da reserva no portal
+  notes          String?
+  cancelReason   String?
+  createdById    String?           @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  checkedInAt    DateTime?
+  checkedOutAt   DateTime?
+
+  guest      Guest              @relation(fields: [guestId], references: [id])
+  roomType   RoomType           @relation(fields: [roomTypeId], references: [id])
+  room       Room?              @relation(fields: [roomId], references: [id])
+  ratePlan   RatePlan?          @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
+  createdBy  User?              @relation("ReservationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companions ReservationGuest[]
+  events     ReservationEvent[]
+  moves      RoomMove[]
+  vehicles   Vehicle[]
+
+  @@index([status, checkIn])
+  @@index([status, checkOut])
+  @@index([roomId])
+  @@index([guestId])
+}
+
+// Acompanhantes (o titular fica em Reservation.guestId).
+model ReservationGuest {
+  reservationId String @db.Uuid
+  guestId       String @db.Uuid
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  guest       Guest       @relation(fields: [guestId], references: [id])
+
+  @@id([reservationId, guestId])
+}
+
+// Histórico da reserva: criada, alterada, check-in, troca de quarto...
+model ReservationEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  reservationId String   @db.Uuid
+  userId        String?  @db.Uuid
+  type          String
+  message       String?
+  createdAt     DateTime @default(now())
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId, createdAt])
+}
+
+// Mudança de quarto de um hóspede já na casa (relatório da Fase 6).
+model RoomMove {
+  id            String   @id @default(uuid()) @db.Uuid
+  reservationId String   @db.Uuid
+  fromRoomId    String   @db.Uuid
+  toRoomId      String   @db.Uuid
+  reason        String
+  userId        String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  fromRoom    Room        @relation("MoveFrom", fields: [fromRoomId], references: [id])
+  toRoom      Room        @relation("MoveTo", fields: [toRoomId], references: [id])
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+// ================================================================
+// GARAGEM (Fase 3)
+// ================================================================
+
+model Vehicle {
+  id            String    @id @default(uuid()) @db.Uuid
+  reservationId String    @db.Uuid
+  plate         String
+  model         String?
+  color         String?
+  spot          String?   // vaga
+  enteredAt     DateTime  @default(now())
+  exitedAt      DateTime?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([exitedAt])
+  @@index([plate])
+}
