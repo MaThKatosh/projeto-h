@@ -15,6 +15,10 @@ powershell -ExecutionPolicy Bypass -File deployinstalar.ps1   # Windows
 bash deploy/instalar.sh                                     # Linux / Mac
 ```
 
+## Versão de teste para amigos (beta)
+
+Hotel de demonstração com link público e apps beta: **[docs/BETA.md](docs/BETA.md)**.
+
 ## Como rodar para desenvolver (primeira vez)
 
 ```bash
