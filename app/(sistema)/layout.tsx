@@ -5,6 +5,8 @@ import { can, ROLE_LABEL } from "@/lib/permissions";
 import { logoutAction } from "@/app/entrar/actions";
 import { Sidebar, type NavItem } from "./sidebar";
 import { openRequestCount } from "@/lib/requests/service";
+import { isDemo } from "@/lib/demo";
+import { FeedbackButton } from "@/components/feedback-button";
 
 import { getT } from "@/lib/i18n/server";
 import type { TFunction } from "@/lib/i18n/translate";
@@ -30,6 +32,7 @@ function navFor(role: Parameters<typeof can>[0], tr: TFunction, requests: number
     ...(can(role, "revenue.manage") ? [{ href: "/revenue", label: tr("Revenue (preços)"), icon: "📈" }] : []),
     ...(can(role, "audit.run") ? [{ href: "/auditoria", label: tr("Auditoria noturna"), icon: "🌙" }] : []),
     { href: "/relatorios", label: tr("Relatórios"), icon: "📊" },
+    ...(isDemo() && can(role, "settings.manage") ? [{ href: "/sugestoes", label: tr("Sugestões dos testadores"), icon: "💬", group: "Administração" }] : []),
     ...(can(role, "settings.manage") ? [{ href: "/configuracoes", label: tr("Configurações"), icon: "⚙️", group: "Administração" }] : []),
     ...(can(role, "rooms.manage") ? [{ href: "/quartos", label: tr("Cadastro de quartos"), icon: "🏨", group: "Administração" }] : []),
     ...(can(role, "menu.manage") ? [{ href: "/cardapio", label: tr("Cardápio e mesas"), icon: "📋", group: "Administração" }] : []),
@@ -53,7 +56,15 @@ export default async function SistemaLayout({ children }: { children: React.Reac
         roleLabel={tr(ROLE_LABEL[user.role])}
         logout={logoutAction}
       />
-      <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-6">
+        {isDemo() && (
+          <div className="no-print mb-3 rounded-lg bg-amber-100 px-3 py-1.5 text-center text-xs font-semibold text-amber-900">
+            {tr("🧪 Versão de teste — dados fictícios. Use o botão “💬 Sugestão / erro” para contar o que achou.")}
+          </div>
+        )}
+        {children}
+      </main>
+      {isDemo() && <FeedbackButton />}
     </div>
   );
 }

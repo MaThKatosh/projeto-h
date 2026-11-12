@@ -37,6 +37,7 @@
       <div class="hint">Server address · Dirección del servidor</div>
     </form>
   </div>
+<script src="config.js"></script>
 <script>
   // App de computador/celular: só guarda o endereço do servidor e abre o
   // sistema. Nenhum dado do hotel fica no aparelho.
@@ -98,6 +99,13 @@
   let auto;
   $("change").addEventListener("click", () => { clearTimeout(auto); showForm(); });
 
+  // Versão beta: o endereço vem embutido. Se o app novo trouxer outro
+  // endereço (o link do beta mudou), ele passa a valer.
+  const preset = (window.HOTEL_SERVER || "").replace(/\/+$/, "");
+  if (preset && localStorage.getItem("hotel.preset") !== preset) {
+    localStorage.setItem("hotel.preset", preset);
+    localStorage.setItem(KEY, preset);
+  }
   const saved = localStorage.getItem(KEY);
   if (saved) {
     // 2 segundos para dar tempo de tocar em "Trocar servidor".

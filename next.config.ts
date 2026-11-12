@@ -16,7 +16,11 @@ const nextConfig: NextConfig = {
   logging: { browserToTerminal: false },
   // O servidor MCP do Next grava o console do navegador em
   // .next/dev/logs/next-development.log — mesmo ciclo de recarga.
-  experimental: { mcpServer: false },
+  experimental: {
+    mcpServer: false,
+    // Link público da versão de teste (túnel): libera o formulário vindo dele.
+    serverActions: { allowedOrigins: (process.env.SERVER_ACTIONS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean) },
+  },
   async headers() {
     return [
       {

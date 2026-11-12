@@ -1,0 +1,45 @@
+# VERSÃO DE TESTE (beta) para amigos testarem pela internet.
+# Banco e sistema separados do desenvolvimento; o link público é feito pelo
+# túnel da Cloudflare (deploy/beta/iniciar-beta.ps1).
+name: hotel-beta
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hotel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?rode iniciar-beta.ps1}
+      POSTGRES_DB: hotel
+      TZ: America/Sao_Paulo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel -d hotel"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # só neste PC; quem vem de fora passa pelo túnel
+      - "127.0.0.1:3100:3000"
+    environment:
+      DATABASE_URL: postgresql://hotel:${POSTGRES_PASSWORD}@db:5432/hotel?schema=public
+      SEED_ADMIN_USERNAME: admin
+      SEED_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SEED_EXAMPLE: "0"
+      DEMO_MODE: "1"
+      COOKIE_SECURE: "1"
+      SERVER_ACTIONS_ORIGINS: "*.trycloudflare.com"
+      TZ: America/Sao_Paulo
+
+volumes:
+  pgdata:

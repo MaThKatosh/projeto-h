@@ -59,6 +59,7 @@ model User {
   pendingClosed       PendingAccount[]   @relation("PendingCloser")
   pendingPayments     PendingPayment[]
   requestsHandled     GuestRequest[]
+  feedbacks           Feedback[]
   folioReversed       FolioEntry[]       @relation("FolioReverser")
   comandasOpened      Comanda[]          @relation("ComandaOpener")
   comandasClosed      Comanda[]          @relation("ComandaCloser")
@@ -877,4 +878,24 @@ model RevenueRule {
   updatedAt  DateTime        @updatedAt
 
   roomType RoomType? @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+}
+
+// ================================================================
+// SUGESTÕES E ERROS ENVIADOS PELOS TESTADORES (versão beta)
+// ================================================================
+
+model Feedback {
+  id        String   @id @default(uuid()) @db.Uuid
+  number    Int      @unique @default(autoincrement())
+  userId    String?  @db.Uuid
+  kind      String // SUGESTAO | ERRO | ELOGIO
+  message   String
+  page      String? // tela onde estava
+  device    String? // navegador / aparelho
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([done, createdAt])
 }

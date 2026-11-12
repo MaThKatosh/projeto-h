@@ -46,3 +46,6 @@ next-env.d.ts
 !.env.example
 deploy/backups/
 /instaladores/
+deploy/beta/build-beta.log
+deploy/beta/link.txt
+deploy/beta/tunnel.log

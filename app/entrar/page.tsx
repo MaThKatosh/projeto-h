@@ -4,6 +4,8 @@ import { getDb } from "@/lib/db";
 import { getHotelSettings } from "@/lib/settings";
 import { LoginForm } from "./login-form";
 import { LanguageSwitch } from "./language-switch";
+import { DemoAccounts } from "./demo-accounts";
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, isDemo } from "@/lib/demo";
 
 import { getT } from "@/lib/i18n/server";
 export default async function EntrarPage() {
@@ -20,6 +22,7 @@ export default async function EntrarPage() {
           <p className="text-sm text-zinc-500">{tr("Entre com o usuário que o gerente criou para você.")}</p>
         </div>
         <LoginForm />
+        {isDemo() && <DemoAccounts accounts={DEMO_ACCOUNTS.map(({ username, hint }) => ({ username, hint }))} password={DEMO_PASSWORD} />}
         <LanguageSwitch />
       </div>
     </main>

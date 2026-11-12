@@ -1,4 +1,5 @@
 import { audit } from "@/lib/audit";
+import { isDemoAccount } from "@/lib/demo";
 import type { Db } from "@/lib/db-types";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "@/lib/auth/password";
 import { generateSessionToken, hashToken } from "@/lib/auth/tokens";
@@ -189,7 +190,8 @@ export async function changeOwnPassword(
     return { ok: false, error: "Revise os campos destacados.", fieldErrors: fieldErrors(parsed.error) };
   }
 
-  const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { passwordHash: true } });
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { passwordHash: true, username: true } });
+  if (isDemoAccount(user.username)) return { ok: false, error: "Na versão de teste a senha das contas de teste não muda." };
   if (!(await verifyPassword(user.passwordHash, parsed.data.currentPassword))) {
     return { ok: false, error: "Revise os campos destacados.", fieldErrors: { currentPassword: ["Senha atual incorreta."] } };
   }
