@@ -244,6 +244,34 @@ export async function postPendingNights(db: Db, actor: SessionUser, reservationI
   return { ok: true, count: nights.length };
 }
 
+// Lança uma cobrança vinda de outro setor (restaurante, frigobar) numa
+// conta de hóspede NA CASA. Quem chama já conferiu a permissão.
+export async function postOutletCharge(
+  db: Db,
+  actorId: string,
+  reservationId: string,
+  charge: { category: Category; description: string; quantity: number; unitCents: number }
+): Promise<string | null> {
+  const r = await db.reservation.findUnique({ where: { id: reservationId }, select: { status: true } });
+  if (!r || r.status !== "HOSPEDADA") return "Só dá para lançar na conta de um hóspede que está na casa.";
+  const amount = charge.quantity * charge.unitCents;
+  if (amount <= 0) return null;
+  await db.folioEntry.create({
+    data: {
+      reservationId,
+      kind: "COBRANCA",
+      category: charge.category,
+      description: charge.description,
+      quantity: charge.quantity,
+      unitCents: charge.unitCents,
+      amountCents: amount,
+      businessDate: fromDateStr(await getBusinessDate(db)),
+      createdById: actorId,
+    },
+  });
+  return null;
+}
+
 // ----------------------------------------------------------------
 // COBRANÇAS E PAGAMENTOS
 // ----------------------------------------------------------------
@@ -416,6 +444,8 @@ export async function reverseEntry(db: Db, actor: SessionUser, entryId: string, 
 export async function checkoutBlocker(db: Db, reservationId: string): Promise<string | null> {
   const folio = await getFolio(db, reservationId);
   if (!folio) return "Reserva não encontrada.";
+  const openTab = await db.comanda.findFirst({ where: { reservationId, status: "ABERTA" }, select: { number: true } });
+  if (openTab) return `O hóspede tem a comanda nº ${openTab.number} aberta no restaurante. Feche-a (no quarto ou paga) antes do check-out.`;
   if (folio.checkoutNights.length > 0) {
     return `Faltam lançar ${folio.checkoutNights.length} diária(s) (${formatBRL(folio.checkoutPreview)}). Use "Fechar a conta" antes do check-out.`;
   }

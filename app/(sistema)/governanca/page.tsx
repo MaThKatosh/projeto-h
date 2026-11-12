@@ -17,6 +17,7 @@ export default async function GovernancaPage() {
       me={{ id: user.id, isHousekeeper: user.role === "GOVERNANCA" }}
       canWork={can(user.role, "rooms.housekeeping")}
       canAssign={can(user.role, "housekeeping.assign")}
+      canMinibar={can(user.role, "minibar.post")}
     />
   );
 }

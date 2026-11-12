@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { LiveDot, useLiveRefresh } from "@/components/live-refresh";
 import { useNow } from "@/components/use-now";
@@ -15,12 +16,14 @@ export function HousekeepingBoard({
   me,
   canWork,
   canAssign,
+  canMinibar,
 }: {
   board: Board;
   serverNow: number;
   me: { id: string; isHousekeeper: boolean };
   canWork: boolean;
   canAssign: boolean;
+  canMinibar: boolean;
 }) {
   const connected = useLiveRefresh(["room.updated", "rooms.changed", "housekeeping.changed", "reservations.changed"]);
   const now = useNow(serverNow);
@@ -80,12 +83,12 @@ export function HousekeepingBoard({
       <div className="grid gap-5 lg:grid-cols-3">
         <Column title="Para arrumar" color="bg-amber-300" count={pending.filter(match).length}>
           {pending.filter(match).map((c) => (
-            <TaskCard key={c.id} card={c} now={now} staff={board.staff} me={me} canWork={canWork} canAssign={canAssign} onError={setError} />
+            <TaskCard key={c.id} card={c} now={now} staff={board.staff} me={me} canWork={canWork} canAssign={canAssign} canMinibar={canMinibar} onError={setError} />
           ))}
         </Column>
         <Column title="Em arrumação" color="bg-orange-500" count={doing.filter(match).length}>
           {doing.filter(match).map((c) => (
-            <TaskCard key={c.id} card={c} now={now} staff={board.staff} me={me} canWork={canWork} canAssign={canAssign} onError={setError} />
+            <TaskCard key={c.id} card={c} now={now} staff={board.staff} me={me} canWork={canWork} canAssign={canAssign} canMinibar={canMinibar} onError={setError} />
           ))}
         </Column>
         <Column title="Limpos hoje" color="bg-emerald-500" count={board.doneToday.length}>
@@ -114,6 +117,7 @@ function TaskCard({
   me,
   canWork,
   canAssign,
+  canMinibar,
   onError,
 }: {
   card: CleaningCard;
@@ -122,6 +126,7 @@ function TaskCard({
   me: { id: string; isHousekeeper: boolean };
   canWork: boolean;
   canAssign: boolean;
+  canMinibar: boolean;
   onError: (msg: string | null) => void;
 }) {
   const [pending, start] = useTransition();
@@ -187,6 +192,11 @@ function TaskCard({
             <button type="button" className="btn-secondary" disabled={pending} onClick={() => run({ action: "pegar" })}>
               Eu arrumo
             </button>
+          )}
+          {canMinibar && card.room.occupancy === "OCUPADO" && (
+            <Link href={`/frigobar?quarto=${encodeURIComponent(card.room.number)}`} className="btn-secondary" title="Conferir o frigobar deste quarto">
+              🧃 Frigobar
+            </Link>
           )}
         </div>
       )}

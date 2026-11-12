@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Mesmos tipos de HotelEvent (lib/realtime.ts).
-export const HOTEL_EVENT_TYPES = ["room.updated", "rooms.changed", "housekeeping.changed", "maintenance.changed", "reservations.changed"] as const;
+export const HOTEL_EVENT_TYPES = ["room.updated", "rooms.changed", "housekeeping.changed", "maintenance.changed", "reservations.changed", "restaurant.changed"] as const;
 
 // Escuta os avisos em tempo real do servidor (/api/eventos).
 // `connected` mostra na tela se a ligação está ativa. Quando a conexão

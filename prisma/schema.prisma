@@ -54,6 +54,10 @@ model User {
   roomMoves           RoomMove[]
   folioPosted         FolioEntry[]       @relation("FolioPoster")
   folioReversed       FolioEntry[]       @relation("FolioReverser")
+  comandasOpened      Comanda[]          @relation("ComandaOpener")
+  comandasClosed      Comanda[]          @relation("ComandaCloser")
+  comandaItems        ComandaItem[]
+  posPayments         PosPayment[]
 }
 
 model AuthSession {
@@ -400,6 +404,7 @@ model Reservation {
   moves      RoomMove[]
   vehicles   Vehicle[]
   folio      FolioEntry[]
+  comandas   Comanda[]
 
   @@index([status, checkIn])
   @@index([status, checkOut])
@@ -542,4 +547,131 @@ model FolioEntry {
 
   @@index([reservationId, createdAt])
   @@index([businessDate, kind])
+}
+
+// ================================================================
+// RESTAURANTE E FRIGOBAR (Fase 5)
+// ================================================================
+
+enum Outlet {
+  RESTAURANTE
+  FRIGOBAR
+}
+
+model MenuItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  outlet     Outlet
+  name       String
+  group      String   // "Bebidas", "Pratos", "Sobremesas"...
+  priceCents Int
+  // Vai para a tela da cozinha? (bebida pronta não precisa)
+  kitchen    Boolean  @default(true)
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  comandaItems ComandaItem[]
+
+  @@unique([outlet, name])
+  @@index([outlet, active])
+}
+
+model DiningTable {
+  id     String  @id @default(uuid()) @db.Uuid
+  name   String  @unique // "1", "2", "Varanda 1"
+  seats  Int     @default(4)
+  active Boolean @default(true)
+
+  comandas Comanda[]
+}
+
+enum ComandaStatus {
+  ABERTA
+  FECHADA
+  CANCELADA
+}
+
+enum ComandaSettlement {
+  QUARTO // lançada na conta do quarto
+  PAGO   // paga no restaurante
+}
+
+// Comanda = a conta de uma mesa, do balcão ou do serviço de quarto.
+model Comanda {
+  id             String             @id @default(uuid()) @db.Uuid
+  number         Int                @unique @default(autoincrement())
+  status         ComandaStatus      @default(ABERTA)
+  tableId        String?            @db.Uuid
+  // Hóspede ligado (serviço de quarto ou quem vai lançar no quarto).
+  reservationId  String?            @db.Uuid
+  customerName   String?
+  people         Int                @default(1)
+  serviceFee     Boolean            @default(true)
+  serviceFeeBp   Int                @default(1000) // 1000 = 10%
+  settlement     ComandaSettlement?
+  totalCents     Int?               // gravado ao fechar
+  cancelReason   String?
+  openedById     String?            @db.Uuid
+  closedById     String?            @db.Uuid
+  openedAt       DateTime           @default(now())
+  closedAt       DateTime?
+
+  table       DiningTable?  @relation(fields: [tableId], references: [id])
+  reservation Reservation?  @relation(fields: [reservationId], references: [id])
+  openedBy    User?         @relation("ComandaOpener", fields: [openedById], references: [id], onDelete: SetNull)
+  closedBy    User?         @relation("ComandaCloser", fields: [closedById], references: [id], onDelete: SetNull)
+  items       ComandaItem[]
+  payments    PosPayment[]
+
+  @@index([status])
+  @@index([closedAt])
+}
+
+enum ItemStatus {
+  PENDENTE  // pedido feito, cozinha ainda não terminou
+  PRONTO    // cozinha terminou, falta levar
+  ENTREGUE
+  CANCELADO
+}
+
+model ComandaItem {
+  id           String     @id @default(uuid()) @db.Uuid
+  comandaId    String     @db.Uuid
+  menuItemId   String     @db.Uuid
+  name         String     // cópia do nome no momento do pedido
+  unitCents    Int        // cópia do preço no momento do pedido
+  quantity     Int
+  notes        String?    // "sem cebola"
+  kitchen      Boolean
+  status       ItemStatus @default(PENDENTE)
+  cancelReason String?
+  createdById  String?    @db.Uuid
+  createdAt    DateTime   @default(now())
+  readyAt      DateTime?
+  deliveredAt  DateTime?
+
+  comanda   Comanda  @relation(fields: [comandaId], references: [id], onDelete: Cascade)
+  menuItem  MenuItem @relation(fields: [menuItemId], references: [id])
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([comandaId])
+  @@index([status, kitchen])
+}
+
+// Pagamento feito direto no restaurante (cliente de fora ou hóspede que
+// preferiu pagar na hora). Entra no borderô do Financeiro.
+model PosPayment {
+  id           String        @id @default(uuid()) @db.Uuid
+  comandaId    String        @db.Uuid
+  method       PaymentMethod
+  amountCents  Int
+  reference    String?
+  businessDate DateTime      @db.Date
+  createdById  String?       @db.Uuid
+  createdAt    DateTime      @default(now())
+
+  comanda   Comanda @relation(fields: [comandaId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessDate])
 }

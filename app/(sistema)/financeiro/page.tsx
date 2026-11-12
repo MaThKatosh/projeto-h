@@ -5,6 +5,7 @@ import { getBusinessDate } from "@/lib/hotel-date";
 import { addDays, formatDate, isDateStr } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
 import { dailyReport, openAccounts } from "@/lib/folio/service";
+import { posPaymentsByDay } from "@/lib/restaurant/service";
 import { CATEGORY_LABEL, METHOD, METHODS, type Category } from "@/lib/folio/rules";
 import { LiveRefresher } from "@/components/live-refresher";
 import { clock } from "@/components/time";
@@ -17,7 +18,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const today = await getBusinessDate(db);
   const { data } = await searchParams;
   const date = isDateStr(data) && data <= today ? data : today;
-  const [report, accounts] = await Promise.all([dailyReport(db, date), openAccounts(db)]);
+  const [report, accounts, pos] = await Promise.all([dailyReport(db, date), openAccounts(db), posPaymentsByDay(db, date)]);
+  // Borderô = contas dos quartos + o que o restaurante recebeu na hora.
+  const byMethod = Object.fromEntries(METHODS.map((m) => [m, report.byMethod[m] + pos.byMethod[m]])) as typeof report.byMethod;
+  const totalReceived = report.totalReceived + pos.total;
   const reversals = report.entries.filter((e) => e.reversalOfId || e.isRefund);
   const owed = accounts.reduce((s, a) => s + Math.max(0, a.balance), 0);
 
@@ -46,12 +50,14 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           {METHODS.map((m) => (
             <div key={m} className={`rounded-xl p-3 ${METHOD[m].color}`}>
               <div className="text-xs">{METHOD[m].icon} {METHOD[m].label}</div>
-              <div className="text-xl font-black">{formatBRL(report.byMethod[m])}</div>
+              <div className="text-xl font-black">{formatBRL(byMethod[m])}</div>
+              {pos.byMethod[m] > 0 && <div className="text-[11px]">restaurante: {formatBRL(pos.byMethod[m])}</div>}
             </div>
           ))}
           <div className="rounded-xl bg-zinc-900 p-3 text-white">
             <div className="text-xs">Total recebido</div>
-            <div className="text-xl font-black">{formatBRL(report.totalReceived)}</div>
+            <div className="text-xl font-black">{formatBRL(totalReceived)}</div>
+            {pos.total > 0 && <div className="text-[11px]">quartos {formatBRL(report.totalReceived)} · restaurante {formatBRL(pos.total)}</div>}
           </div>
         </div>
         <p className="mt-1 text-xs text-zinc-500">Estornos e devoluções já estão descontados.</p>

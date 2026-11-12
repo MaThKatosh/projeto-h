@@ -53,6 +53,11 @@ export type Permission =
   | "finance.view" // ver contas e o financeiro (borderô)
   | "finance.post" // lançar cobranças e receber pagamentos
   | "finance.reverse" // estornar lançamentos
+  | "restaurant.use" // abrir comanda, pedir, receber, lançar no quarto
+  | "restaurant.cancel" // cancelar item já preparado ou comanda com itens
+  | "kitchen.view" // tela da cozinha
+  | "menu.manage" // cardápio, mesas, taxa de serviço
+  | "minibar.post" // lançar consumo do frigobar
   | "users.manage";
 
 const PERMISSIONS: Record<Permission, readonly Role[]> = {
@@ -72,6 +77,11 @@ const PERMISSIONS: Record<Permission, readonly Role[]> = {
   "finance.view": ["ADMIN", "GERENTE", "RECEPCAO"],
   "finance.post": ["ADMIN", "GERENTE", "RECEPCAO"],
   "finance.reverse": ["ADMIN", "GERENTE"],
+  "restaurant.use": ["ADMIN", "GERENTE", "RECEPCAO", "RESTAURANTE"],
+  "restaurant.cancel": ["ADMIN", "GERENTE"],
+  "kitchen.view": ["ADMIN", "GERENTE", "RESTAURANTE"],
+  "menu.manage": ["ADMIN", "GERENTE"],
+  "minibar.post": ["ADMIN", "GERENTE", "RECEPCAO", "GOVERNANCA"],
   "users.manage": ["ADMIN", "GERENTE"],
 };
 
