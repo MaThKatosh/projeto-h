@@ -17,7 +17,7 @@ function navFor(role: Parameters<typeof can>[0]): NavItem[] {
       : []),
     ...(can(role, "housekeeping.view") ? [{ href: "/governanca", label: "Governança", icon: "🧹" }] : []),
     ...(can(role, "maintenance.view") ? [{ href: "/manutencao", label: "Manutenção", icon: "🔧" }] : []),
-    { label: "Financeiro", icon: "💳", soon: "Fase 4" },
+    ...(can(role, "finance.view") ? [{ href: "/financeiro", label: "Financeiro", icon: "💳" }] : []),
     { label: "Restaurante", icon: "🍽", soon: "Fase 5" },
     { label: "Frigobar", icon: "🧃", soon: "Fase 5" },
     { label: "Auditoria e relatórios", icon: "📊", soon: "Fase 6" },

@@ -45,7 +45,8 @@ app/(sistema)       telas internas (menu lateral)
   recepcao/         chegadas e saídas do dia
   reservas/         mapa de reservas, lista, nova reserva, detalhe
   garagem/          veículos na casa
-  tarifas/          tarifas e ISS
+  tarifas/          tarifas, ISS e estacionamento
+  financeiro/       borderô do dia e contas abertas
   quartos/          cadastro de tipos e quartos
   usuarios/         usuários e cargos
   perfil/           trocar a própria senha
@@ -56,6 +57,7 @@ lib/housekeeping/   tarefas de limpeza
 lib/maintenance/    ocorrências e cálculo da manutenção do quarto
 lib/reservations/   reservas, disponibilidade, check-in/out, troca, garagem
 lib/rates/          tarifas
+lib/folio/          conta do quarto: lançamentos, diárias, estornos
 lib/hotel-date.ts   data do sistema (data hoteleira)
 lib/realtime.ts     avisos em tempo real (PostgreSQL LISTEN/NOTIFY)
 docs/               uma página por fase
@@ -66,7 +68,7 @@ docs/               uma página por fase
 - [x] **Fase 1** — base, login, cargos, cadastro de quartos, mapa ao vivo ([docs/FASE-1.md](docs/FASE-1.md))
 - [x] **Fase 2** — governança e manutenção: tarefas de limpeza, ocorrências, tudo ligado ao mapa ([docs/FASE-2.md](docs/FASE-2.md))
 - [x] **Fase 3** — reservas, tarifas com ISS, recepção, check-in/out, troca de quarto, garagem ([docs/FASE-3.md](docs/FASE-3.md))
-- [ ] Fase 4 — conta do quarto, pagamentos, estornos
+- [x] **Fase 4** — conta do quarto, pagamentos, estornos, check-out com conta zerada, borderô ([docs/FASE-4.md](docs/FASE-4.md))
 - [ ] Fase 5 — restaurante (cardápio, mesas, comandas) e frigobar
 - [ ] Fase 6 — auditoria noturna e relatórios
 - [ ] Fase 7 — apps instalados (Windows, Mac, Linux, celular) e integração com portais

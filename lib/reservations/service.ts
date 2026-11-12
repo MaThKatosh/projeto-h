@@ -9,6 +9,8 @@ import { formatBRL } from "@/lib/money";
 import { getBusinessDate } from "@/lib/hotel-date";
 import { applyRoomChanges, type RoomView } from "@/lib/rooms/service";
 import { guestData, guestSelect, toGuestView, type GuestView } from "@/lib/guests/service";
+import { checkoutBlocker } from "@/lib/folio/service";
+import { effectiveCheckOut, folioTotals } from "@/lib/folio/rules";
 import {
   ACTIVE_STATUSES,
   computeTotals,
@@ -592,6 +594,14 @@ export async function cancelReservation(db: Db, actor: SessionUser, id: string, 
   if (noShow && toDateStr(r.checkIn) > (await getBusinessDate(db))) {
     return { ok: false, error: "A data de entrada ainda não chegou." };
   }
+  // Dinheiro do hóspede não pode ficar "perdido" numa reserva cancelada.
+  const { balance } = folioTotals(await db.folioEntry.findMany({ where: { reservationId: id }, select: { kind: true, amountCents: true } }));
+  if (balance < 0) {
+    return {
+      ok: false,
+      error: `Esta reserva tem ${formatBRL(-balance)} pago (sinal). Faça a devolução na conta antes de cancelar, ou registre a multa como cobrança.`,
+    };
+  }
 
   await db.reservation.update({
     where: { id },
@@ -711,11 +721,13 @@ export async function checkOut(db: Db, actor: SessionUser, id: string): Promise<
   });
   if (!r || r.status !== "HOSPEDADA" || !r.roomId) return { ok: false, error: "Este hóspede não está na casa." };
 
-  // Fase 4: aqui vai exigir a conta zerada.
+  // A conta precisa estar fechada: diárias lançadas e saldo zero.
+  const blocker = await checkoutBlocker(db, id);
+  if (blocker) return { ok: false, error: blocker };
+
   const today = await getBusinessDate(db);
-  const checkInDate = toDateStr(r.checkIn);
   // Saída antecipada libera as noites que não serão usadas.
-  const newCheckOut = toDateStr(r.checkOut) > today ? (today > checkInDate ? today : addDays(checkInDate, 1)) : toDateStr(r.checkOut);
+  const newCheckOut = effectiveCheckOut(toDateStr(r.checkIn), toDateStr(r.checkOut), today);
 
   await db.reservation.update({
     where: { id },

@@ -4,10 +4,24 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/dal";
 import { saveRatePlan } from "@/lib/rates/service";
+import { parseBRL } from "@/lib/money";
+import { setParkingDailyCents } from "@/lib/settings";
+import { audit } from "@/lib/audit";
 
 export async function saveRatePlanAction(id: string | null, input: unknown) {
   const { user } = await requirePermission("rates.manage");
   const result = await getDb().$transaction((tx) => saveRatePlan(tx, user, id, input));
   if (result.ok) revalidatePath("/tarifas");
   return result;
+}
+
+export async function saveParkingAction(value: string): Promise<{ ok: boolean; error?: string }> {
+  const { user } = await requirePermission("rates.manage");
+  const cents = value.trim() === "" ? 0 : parseBRL(value);
+  if (cents === null || cents < 0 || cents > 10_000_000) return { ok: false, error: "Valor inválido. Ex.: 30,00 (ou 0 para grátis)" };
+  const db = getDb();
+  await setParkingDailyCents(db, cents);
+  await audit(db, "settings.parking", { userId: user.id, metadata: { cents } });
+  revalidatePath("/tarifas");
+  return { ok: true };
 }

@@ -12,8 +12,11 @@ import type { ReservationDetail } from "@/lib/reservations/service";
 import { formatDate, nightsBetween, weekday, type DateStr } from "@/lib/dates";
 import { formatBRL, formatPercent } from "@/lib/money";
 import { SOURCE_LABEL, STATUS } from "@/lib/reservations/rules";
+import { effectiveCheckOut } from "@/lib/folio/rules";
 import { GuestFields, readGuest, readVehicle, VehicleFields } from "../guest-fields";
 import { StayForm } from "../stay-form";
+import type { FolioView } from "@/lib/folio/service";
+import { Balance, Folio, PaymentForm } from "./folio";
 import {
   addCompanionAction,
   addVehicleAction,
@@ -23,6 +26,7 @@ import {
   checkOutAction,
   freeRoomsAction,
   moveRoomAction,
+  postNightsAction,
   readyRoomsAction,
   removeCompanionAction,
   updateGuestAction,
@@ -44,6 +48,8 @@ const EVENT_LABEL: Record<string, string> = {
   acompanhante: "Acompanhante incluído",
   acompanhante_removido: "Acompanhante removido",
   veiculo: "Garagem",
+  conta: "Conta",
+  estorno: "Estorno",
 };
 
 export function ReservationView({
@@ -52,6 +58,9 @@ export function ReservationView({
   plans,
   types,
   canManage,
+  folio,
+  canPost,
+  canReverse,
   initialAction,
 }: {
   r: ReservationDetail;
@@ -59,6 +68,9 @@ export function ReservationView({
   plans: RatePlanView[];
   types: { id: string; name: string; capacity: number }[];
   canManage: boolean;
+  folio: FolioView;
+  canPost: boolean;
+  canReverse: boolean;
   initialAction: "checkin" | "checkout" | null;
 }) {
   const router = useRouter();
@@ -119,7 +131,7 @@ export function ReservationView({
       )}
 
       {panel === "checkin" && <CheckInPanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
-      {panel === "checkout" && <CheckOutPanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
+      {panel === "checkout" && <CheckOutPanel r={r} today={today} folio={folio} canPost={canPost} onClose={() => setPanel(null)} onDone={done} onStep={() => router.refresh()} />}
       {panel === "trocar" && <MovePanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
       {panel === "quarto" && <AssignPanel r={r} onClose={() => setPanel(null)} onDone={done} />}
       {(panel === "cancelar" || panel === "noshow") && <CancelPanel r={r} noShow={panel === "noshow"} onClose={() => setPanel(null)} onDone={done} />}
@@ -182,9 +194,11 @@ export function ReservationView({
             {r.chargeIss && <Item k={`ISS ${formatPercent(r.issBasisPoints)}`} v={formatBRL(r.totals.iss)} />}
             <div className="mt-2 border-t border-zinc-200 pt-2 text-lg font-bold">{formatBRL(r.totals.total)}</div>
           </dl>
-          <p className="mt-2 text-xs text-zinc-500">A conta do quarto (consumos e pagamentos) chega na Fase 4.</p>
+          <p className="mt-2 text-xs text-zinc-500">Previsto pela reserva. O que vale é a conta abaixo.</p>
         </section>
       </div>
+
+      <Folio reservationId={r.id} folio={folio} status={r.status} canPost={canPost} canReverse={canReverse} onDone={done} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-5">
@@ -369,23 +383,97 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
   );
 }
 
-function CheckOutPanel({ r, today, onClose, onDone }: PanelProps & { today: DateStr }) {
+// Check-out em 3 passos: lançar as diárias que faltam → receber →
+// confirmar. O servidor confere de novo (conta precisa estar zerada).
+function CheckOutPanel({
+  r,
+  today,
+  folio,
+  canPost,
+  onClose,
+  onDone,
+  onStep,
+}: PanelProps & { today: DateStr; folio: FolioView; canPost: boolean; onStep: () => void }) {
   const { pending, state, run } = useAction();
-  const early = r.checkOut > today;
+  const [stepMsg, setStepMsg] = useState<string | null>(null);
+  // Antecipada só se a saída efetiva encurta a estadia (1 noite é o mínimo).
+  const early = effectiveCheckOut(r.checkIn, r.checkOut, today) < r.checkOut;
   const cars = r.vehicleList.filter((v) => !v.exitedAt);
+  const nightsLeft = folio.checkoutNights.length;
+  const settled = nightsLeft === 0 && folio.balance === 0;
+  const step = (msg: string) => {
+    setStepMsg(msg);
+    onStep();
+  };
+
   return (
     <Box title={`Check-out — quarto ${r.roomNumber}`} onClose={onClose}>
-      <ul className="mb-3 list-disc space-y-1 pl-5 text-sm">
-        {early && <li className="text-amber-700">Saída antecipada: a reserva era até {formatDate(r.checkOut)}. As noites não usadas serão liberadas.</li>}
-        <li>O quarto {r.roomNumber} fica livre e vai para a governança como <b>sujo</b>.</li>
-        {cars.length > 0 && <li>Saída na garagem: {cars.map((v) => v.plate).join(", ")}.</li>}
-        <li className="text-zinc-500">A conferência da conta (consumos e pagamentos) entra na Fase 4.</li>
-      </ul>
+      <ol className="space-y-4">
+        <Step n={1} done={nightsLeft === 0} title="Fechar a conta (diárias)">
+          {nightsLeft > 0 ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span>
+                Faltam {nightsLeft} diária(s): {folio.checkoutNights.map((n) => formatDate(n)).join(", ")} —{" "}
+                <b>{formatBRL(folio.checkoutPreview)}</b> (com ISS{folio.parkingDailyCents > 0 ? " e garagem" : ""}).
+              </span>
+              {canPost && (
+                <button
+                  className="btn-primary"
+                  disabled={pending}
+                  onClick={() => run(() => postNightsAction(r.id, true), () => step("Diárias lançadas."))}
+                >
+                  Lançar diárias
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-600">Todas as diárias da estadia estão na conta.</p>
+          )}
+          {early && <p className="mt-1 text-xs text-amber-700">Saída antecipada: a reserva era até {formatDate(r.checkOut)}. As noites não usadas não são cobradas.</p>}
+        </Step>
+
+        <Step n={2} done={nightsLeft === 0 && folio.balance === 0} title="Receber o pagamento">
+          <div className="flex flex-wrap items-center gap-3">
+            <Balance balance={folio.balance} />
+            {folio.balance < 0 && <p className="text-sm text-sky-800">O hóspede pagou a mais: use “Devolver crédito” na conta abaixo.</p>}
+          </div>
+          {folio.balance > 0 && nightsLeft === 0 && canPost && (
+            <PaymentForm reservationId={r.id} suggested={folio.balance} onClose={() => undefined} onDone={step} />
+          )}
+        </Step>
+
+        <Step n={3} done={false} title="Confirmar a saída">
+          <ul className="mb-3 list-disc space-y-1 pl-5 text-sm">
+            <li>O quarto {r.roomNumber} fica livre e vai para a governança como <b>sujo</b>.</li>
+            {cars.length > 0 && <li>Saída na garagem: {cars.map((v) => v.plate).join(", ")}.</li>}
+          </ul>
+          <button
+            className="btn bg-blue-600 px-6 py-3 text-white hover:bg-blue-700"
+            disabled={pending || !settled}
+            title={settled ? undefined : "Feche a conta primeiro"}
+            onClick={() => run(() => checkOutAction(r.id), () => onDone("Check-out feito. Quarto enviado para a governança."))}
+          >
+            {pending ? "Aguarde..." : "Confirmar check-out"}
+          </button>
+        </Step>
+      </ol>
+      {stepMsg && !state.error && <p className="mt-3 text-sm text-emerald-700">✓ {stepMsg}</p>}
       <FormMessage error={state.error} />
-      <button className="btn bg-blue-600 px-6 py-3 text-white hover:bg-blue-700" disabled={pending} onClick={() => run(() => checkOutAction(r.id), () => onDone("Check-out feito. Quarto enviado para a governança."))}>
-        {pending ? "Fazendo check-out..." : "Confirmar check-out"}
-      </button>
     </Box>
+  );
+}
+
+function Step({ n, done, title, children }: { n: number; done: boolean; title: string; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${done ? "bg-emerald-600 text-white" : "bg-zinc-200 text-zinc-700"}`}>
+        {done ? "✓" : n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 font-semibold">{title}</div>
+        {children}
+      </div>
+    </li>
   );
 }
 

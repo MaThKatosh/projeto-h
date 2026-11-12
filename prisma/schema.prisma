@@ -52,6 +52,8 @@ model User {
   reservationsCreated Reservation[]      @relation("ReservationCreator")
   reservationEvents   ReservationEvent[]
   roomMoves           RoomMove[]
+  folioPosted         FolioEntry[]       @relation("FolioPoster")
+  folioReversed       FolioEntry[]       @relation("FolioReverser")
 }
 
 model AuthSession {
@@ -397,6 +399,7 @@ model Reservation {
   events     ReservationEvent[]
   moves      RoomMove[]
   vehicles   Vehicle[]
+  folio      FolioEntry[]
 
   @@index([status, checkIn])
   @@index([status, checkOut])
@@ -466,4 +469,77 @@ model Vehicle {
 
   @@index([exitedAt])
   @@index([plate])
+}
+
+// ================================================================
+// CONTA DO QUARTO (Fase 4)
+// ================================================================
+//
+// Cada reserva tem uma conta. Lançamentos NUNCA são apagados nem
+// alterados: um lançamento errado é ESTORNADO, o que cria um novo
+// lançamento com valor negativo apontando para o original.
+//
+//   saldo = soma das COBRANÇAS - soma dos PAGAMENTOS
+//   saldo > 0: hóspede deve · saldo < 0: hóspede tem crédito
+//
+// businessDate = data do sistema no momento do lançamento (borderô).
+
+enum FolioKind {
+  COBRANCA
+  PAGAMENTO
+}
+
+enum ChargeCategory {
+  DIARIA
+  ISS
+  ESTACIONAMENTO
+  FRIGOBAR
+  RESTAURANTE
+  LAVANDERIA
+  TELEFONE
+  DANOS
+  OUTRO
+}
+
+enum PaymentMethod {
+  DINHEIRO
+  PIX
+  CREDITO
+  DEBITO
+  TRANSFERENCIA
+}
+
+model FolioEntry {
+  id            String          @id @default(uuid()) @db.Uuid
+  reservationId String          @db.Uuid
+  kind          FolioKind
+  category      ChargeCategory? // cobranças
+  method        PaymentMethod?  // pagamentos
+  description   String
+  quantity      Int             @default(1)
+  unitCents     Int?
+  amountCents   Int             // negativo = estorno ou devolução
+  // Noite a que a diária/ISS/estacionamento se refere (evita lançar duas vezes).
+  nightDate     DateTime?       @db.Date
+  reference     String?         // NSU, autorização, ID do Pix (NUNCA número de cartão)
+  installments  Int?
+  isRefund      Boolean         @default(false) // devolução de crédito ao hóspede
+  businessDate  DateTime        @db.Date
+  createdById   String?         @db.Uuid
+  createdAt     DateTime        @default(now())
+
+  // Estorno
+  reversalOfId  String?         @unique @db.Uuid
+  reversedAt    DateTime?
+  reversedById  String?         @db.Uuid
+  reverseReason String?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  createdBy   User?       @relation("FolioPoster", fields: [createdById], references: [id], onDelete: SetNull)
+  reversedBy  User?       @relation("FolioReverser", fields: [reversedById], references: [id], onDelete: SetNull)
+  reversalOf  FolioEntry? @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal    FolioEntry? @relation("Reversal")
+
+  @@index([reservationId, createdAt])
+  @@index([businessDate, kind])
 }

@@ -13,6 +13,7 @@ import type { RoomView } from "@/lib/rooms/service";
 import { searchGuests } from "@/lib/guests/service";
 import { advanceBusinessDate } from "@/lib/hotel-date";
 import * as svc from "@/lib/reservations/service";
+import * as folio from "@/lib/folio/service";
 
 export type ActionResult = { ok: boolean; error?: string; fieldErrors?: FieldErrors; id?: string; number?: number };
 
@@ -148,4 +149,28 @@ export async function freeRoomsAction(from: string, to: string, reservationId?: 
   return grid.rooms
     .filter((r) => !r.blocked && !ids.has(r.id))
     .sort((a, b) => a.number.localeCompare(b.number, "pt-BR", { numeric: true }));
+}
+
+// ----------------------------------------------------------------
+// Conta do quarto (Fase 4)
+// ----------------------------------------------------------------
+
+export async function postNightsAction(reservationId: string, forCheckout: boolean) {
+  return run((db, u) => folio.postPendingNights(db, u, reservationId, forCheckout));
+}
+
+export async function addChargeAction(reservationId: string, input: unknown) {
+  return run((db, u) => folio.addCharge(db, u, reservationId, input));
+}
+
+export async function addPaymentAction(reservationId: string, input: unknown) {
+  return run((db, u) => folio.addPayment(db, u, reservationId, input));
+}
+
+export async function refundAction(reservationId: string, input: unknown) {
+  return run((db, u) => folio.refund(db, u, reservationId, input));
+}
+
+export async function reverseAction(entryId: string, reason: string) {
+  return run((db, u) => folio.reverseEntry(db, u, entryId, reason));
 }

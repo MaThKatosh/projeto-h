@@ -50,6 +50,9 @@ export type Permission =
   | "reservations.manage" // criar/alterar reservas, check-in/out, troca de quarto
   | "rates.manage" // tarifas
   | "businessDate.advance" // avançar a data do sistema (até a auditoria da Fase 6)
+  | "finance.view" // ver contas e o financeiro (borderô)
+  | "finance.post" // lançar cobranças e receber pagamentos
+  | "finance.reverse" // estornar lançamentos
   | "users.manage";
 
 const PERMISSIONS: Record<Permission, readonly Role[]> = {
@@ -66,6 +69,9 @@ const PERMISSIONS: Record<Permission, readonly Role[]> = {
   "reservations.manage": ["ADMIN", "GERENTE", "RECEPCAO"],
   "rates.manage": ["ADMIN", "GERENTE"],
   "businessDate.advance": ["ADMIN", "GERENTE"],
+  "finance.view": ["ADMIN", "GERENTE", "RECEPCAO"],
+  "finance.post": ["ADMIN", "GERENTE", "RECEPCAO"],
+  "finance.reverse": ["ADMIN", "GERENTE"],
   "users.manage": ["ADMIN", "GERENTE"],
 };
 
