@@ -1,4 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { forecast } from "@/lib/revenue/service";
+import { INTEGRATION_USERNAME, systemActor } from "@/lib/system-users";
 import { z } from "zod";
 import type { Db } from "@/lib/db-types";
 import type { Failure, SessionUser } from "@/lib/auth/service";
@@ -237,19 +239,9 @@ async function findGuest(db: Db, r: ExternalReservation): Promise<string | null>
 
 // ---------------------------------------------------------------- channel manager
 
-// "#" não é aceito em nomes de usuário: nenhum funcionário consegue criar este.
-export const INTEGRATION_USERNAME = "#integracao";
-
-// Usuário técnico que aparece como autor das reservas que chegam pela API.
-// Fica inativo: ninguém entra no sistema com ele.
+// Autor das reservas que chegam pela API (usuário técnico, inativo).
 export async function integrationActor(db: Db): Promise<SessionUser> {
-  const u = await db.user.upsert({
-    where: { username: INTEGRATION_USERNAME },
-    update: {},
-    create: { username: INTEGRATION_USERNAME, fullName: "Integração (channel manager)", role: "RECEPCAO", active: false, passwordHash: "!" },
-    select: { id: true, username: true, fullName: true, role: true },
-  });
-  return u;
+  return systemActor(db, INTEGRATION_USERNAME);
 }
 
 const TOKEN_KEY = "integrationToken";
@@ -345,16 +337,18 @@ export async function applyApiReservation(db: Db, input: unknown) {
 
 // Disponibilidade por tipo e noite (para o channel manager fechar vendas).
 export async function availabilityForApi(db: Db, from: DateStr, to: DateStr) {
-  const list = await availability(db, from, to);
-  const nights = list[0]?.byNight.length ?? 0;
-  const dates = Array.from({ length: nights }, (_, i) => addDays(from, i));
-  return list.map((t) => ({
-    roomTypeId: t.roomTypeId,
-    roomType: t.name,
-    capacity: t.capacity,
-    totalRooms: t.total,
-    nights: t.byNight.map((free, i) => ({ date: dates[i], free })),
-  }));
+  // Vagas + preço sugerido pelo revenue management (centavos), por noite.
+  const [list, f] = await Promise.all([availability(db, from, to), forecast(db, from, nightsBetween(from, to))]);
+  return list.map((t) => {
+    const row = f.rows.find((r) => r.roomTypeId === t.roomTypeId);
+    return {
+      roomTypeId: t.roomTypeId,
+      roomType: t.name,
+      capacity: t.capacity,
+      totalRooms: t.total,
+      nights: t.byNight.map((free, i) => ({ date: addDays(from, i), free, suggestedPriceCents: row?.cells[i]?.suggestion?.price ?? null })),
+    };
+  });
 }
 
 // Escolhas de "tipo do portal → tipo do hotel", lembradas por portal.

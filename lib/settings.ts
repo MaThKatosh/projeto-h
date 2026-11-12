@@ -32,6 +32,26 @@ export async function setParkingDailyCents(db: Db, cents: number) {
   await write(db, "parkingDailyCents", cents);
 }
 
+// Vagas da garagem (0 = sem limite).
+export async function getParkingSpots(db: Db): Promise<number> {
+  const n = Number((await read(db, "parkingSpots")) ?? 0);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+export async function setParkingSpots(db: Db, spots: number) {
+  await write(db, "parkingSpots", spots);
+}
+
+// Garagem lotada? Devolve a mensagem para a tela, ou null se há vaga.
+export async function parkingFull(db: Db): Promise<string | null> {
+  const spots = await getParkingSpots(db);
+  if (!spots) return null;
+  // um de cada vez: duas recepções não ocupam a última vaga juntas
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('garagem'))`;
+  const used = await db.vehicle.count({ where: { exitedAt: null } });
+  return used >= spots ? `Garagem lotada: ${used} de ${spots} vagas ocupadas.` : null;
+}
+
 export type HotelSettings = {
   hotelName: string;
   defaultLocale: Locale;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getParkingSpots } from "@/lib/settings";
 import { getDb } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/permissions";
@@ -16,7 +17,7 @@ export default async function GaragemPage({ searchParams }: { searchParams: Prom
   const tr = await getT();
   const { user } = await requirePermission("reservations.view");
   const db = getDb();
-  const [cars, today, { q = "" }] = await Promise.all([garage(db), getBusinessDate(db), searchParams]);
+  const [cars, today, { q = "" }, spots] = await Promise.all([garage(db), getBusinessDate(db), searchParams, getParkingSpots(db)]);
   const term = q.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   const shown = term ? cars.filter((c) => c.plate.includes(term) || c.roomNumber === q.trim()) : cars;
   const canManage = can(user.role, "reservations.manage");
@@ -29,8 +30,11 @@ export default async function GaragemPage({ searchParams }: { searchParams: Prom
           <LiveRefresher types={["reservations.changed"]} />
         </div>
         <div className="card px-4 py-2">
-          <div className="text-xs text-zinc-500">{tr("Veículos na garagem")}</div>
-          <div className="text-2xl font-bold">{cars.length}</div>
+          <div className="text-xs text-zinc-500">{spots ? tr("Vagas ocupadas") : tr("Veículos na garagem")}</div>
+          <div className={`text-2xl font-bold ${spots && cars.length >= spots ? "text-red-600" : ""}`}>
+            {spots ? tr("{0} de {1}", [cars.length, spots]) : cars.length}
+          </div>
+          {spots > 0 && <div className="text-xs text-zinc-500">{cars.length >= spots ? tr("lotada") : tr("{0} livre(s)", [spots - cars.length])}</div>}
         </div>
       </div>
       <p className="text-sm text-zinc-500">{tr("Veículos entram pelo check-in ou pelo botão “Veículo” na reserva do hóspede. No check-out a saída é registrada sozinha.")}</p>

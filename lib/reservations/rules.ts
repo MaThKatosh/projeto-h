@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { guestFnrhFields } from "@/lib/guests/fnrh";
+import { birthDateProblem, isBrazil, isValidCpf, normalizeCep } from "@/lib/guests/validate";
+import { normalizeCountry } from "@/lib/guests/countries";
 import { isDateStr, nightsBetween, type DateStr } from "@/lib/dates";
 import { parseBRL } from "@/lib/money";
 import { displayStatus, type RoomState } from "@/lib/rooms/status";
@@ -119,7 +121,26 @@ export const guestSchema = z.object({
   state: optionalText(30),
   ...guestFnrhFields,
   notes: optionalText(500),
-});
+})
+  // Ficha bem preenchida: CPF de verdade, nascimento possível, CEP válido.
+  .superRefine((g, ctx) => {
+    if (g.docType === "CPF" && g.docNumber && !isValidCpf(g.docNumber)) {
+      ctx.addIssue({ code: "custom", path: ["docNumber"], message: "CPF inválido. Confira os números." });
+    }
+    if (g.birthDate) {
+      const problem = birthDateProblem(g.birthDate);
+      if (problem) ctx.addIssue({ code: "custom", path: ["birthDate"], message: problem });
+    }
+    if (g.zipCode && isBrazil(g.country) && !normalizeCep(g.zipCode)) {
+      ctx.addIssue({ code: "custom", path: ["zipCode"], message: "CEP inválido (8 números)." });
+    }
+  })
+  .transform((g) => ({
+    ...g,
+    nationality: normalizeCountry(g.nationality),
+    country: normalizeCountry(g.country),
+    zipCode: g.zipCode && isBrazil(g.country) ? normalizeCep(g.zipCode) : g.zipCode,
+  }));
 
 export type GuestInput = z.infer<typeof guestSchema>;
 

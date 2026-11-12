@@ -19,6 +19,90 @@ const byTimestamp = (p: ReportParams) => ({ gte: localStart(p.from), lt: localSt
 
 const methodOptions = (Object.keys(METHOD) as Method[]).map((m) => ({ value: m, label: METHOD[m].label }));
 
+// ---------------------------------------------------------------- recebimentos
+// Setor = onde o dinheiro entrou: na conta do quarto (recepção), no
+// restaurante, ou numa conta pendente recebida depois.
+const SECTOR_OPTIONS = [
+  { value: "RECEPCAO", label: "Recepção (contas dos quartos)" },
+  { value: "RESTAURANTE", label: "Restaurante" },
+  { value: "PENDENTES", label: "Contas pendentes" },
+];
+const SECTOR_SHORT: Record<string, string> = { RECEPCAO: "Recepção", RESTAURANTE: "Restaurante", PENDENTES: "Contas pendentes" };
+
+type Receipt = {
+  dia: string;
+  hora: string;
+  setor: string;
+  setorKey: string;
+  forma: string;
+  method: Method;
+  origem: string;
+  detalhe: string;
+  bandeira: string | null;
+  referencia: string | null;
+  por: string;
+  userId: string | null;
+  valor: number;
+};
+
+// Quem já recebeu algum pagamento (para o filtro "Usuário").
+async function paymentUsers(db: Parameters<ReportDef["run"]>[0]) {
+  const users = await db.user.findMany({
+    where: { OR: [{ folioPosted: { some: { kind: "PAGAMENTO" } } }, { posPayments: { some: {} } }, { pendingPayments: { some: {} } }] },
+    orderBy: { fullName: "asc" },
+    select: { id: true, fullName: true },
+  });
+  return users.map((u) => ({ value: u.id, label: u.fullName }));
+}
+
+async function receipts(db: Parameters<ReportDef["run"]>[0], p: ReportParams): Promise<Receipt[]> {
+  const method = p.filter as Method | undefined;
+  const userId = p.extra?.usuario;
+  const sector = p.extra?.setor;
+  const common = { businessDate: byBusinessDate(p), ...(method ? { method } : {}), ...(userId ? { createdById: userId } : {}) };
+  const [folio, pos, pend] = await Promise.all([
+    !sector || sector === "RECEPCAO"
+      ? db.folioEntry.findMany({
+          where: { kind: "PAGAMENTO", ...common },
+          orderBy: { createdAt: "asc" },
+          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, installments: true, description: true, createdById: true, createdBy: { select: { fullName: true } }, reservation: { select: { number: true, room: { select: { number: true } }, guest: { select: { fullName: true } } } } },
+        })
+      : [],
+    !sector || sector === "RESTAURANTE"
+      ? db.posPayment.findMany({
+          where: common,
+          orderBy: { createdAt: "asc" },
+          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, createdById: true, createdBy: { select: { fullName: true } }, comanda: { select: { number: true } } },
+        })
+      : [],
+    !sector || sector === "PENDENTES"
+      ? db.pendingPayment.findMany({
+          where: common,
+          orderBy: { createdAt: "asc" },
+          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, createdById: true, createdBy: { select: { fullName: true } }, pendingAccount: { select: { number: true, guest: { select: { fullName: true } } } } },
+        })
+      : [],
+  ]);
+  const base = (x: { businessDate: Date; createdAt: Date; method: unknown; cardBrand: string | null; reference: string | null; createdById: string | null; createdBy: { fullName: string } | null; amountCents: number }, key: string) => ({
+    dia: toDateStr(x.businessDate),
+    hora: x.createdAt.toISOString(),
+    setor: SECTOR_SHORT[key],
+    setorKey: key,
+    forma: METHOD[x.method as Method].label,
+    method: x.method as Method,
+    bandeira: x.cardBrand,
+    referencia: x.reference,
+    por: x.createdBy?.fullName ?? "—",
+    userId: x.createdById,
+    valor: x.amountCents,
+  });
+  return [
+    ...folio.map((f) => ({ ...base(f, "RECEPCAO"), origem: `Quarto ${f.reservation.room?.number ?? "—"} · ${f.reservation.guest.fullName}`, detalhe: f.description + (f.installments && f.installments > 1 ? ` (${f.installments}x)` : "") })),
+    ...pos.map((x) => ({ ...base(x, "RESTAURANTE"), origem: `Restaurante comanda nº ${x.comanda.number}`, detalhe: "Pagamento no restaurante" })),
+    ...pend.map((x) => ({ ...base(x, "PENDENTES"), origem: `Conta pendente nº ${x.pendingAccount.number} · ${x.pendingAccount.guest.fullName}`, detalhe: "Recebimento de conta pendente" })),
+  ].sort((x, y) => x.hora.localeCompare(y.hora));
+}
+
 export const REPORTS: ReportDef[] = [
   // ------------------------------------------------------------ RECEPÇÃO
   {
@@ -421,57 +505,28 @@ export const REPORTS: ReportDef[] = [
   {
     slug: "bordero",
     title: "Borderô por forma de pagamento",
-    description: "Todos os recebimentos (quartos e restaurante) no período, por forma: crédito, débito, Pix, dinheiro e transferência. Filtre por uma forma.",
+    description: "Todos os recebimentos (quartos, restaurante e contas pendentes) no período, por forma de pagamento, usuário e setor. Filtre por forma, usuário ou setor.",
     group: "Financeiro",
     roles: [...ALL_FRONT],
     period: "range",
     defaultPeriod: "today",
     filter: { label: "Forma de pagamento", options: methodOptions },
+    extraFilters: [
+      { key: "usuario", label: "Funcionário", options: paymentUsers },
+      { key: "setor", label: "Setor", options: async () => SECTOR_OPTIONS },
+    ],
     async run(db, p) {
-      const method = p.filter as Method | undefined;
-      const [folio, pos] = await Promise.all([
-        db.folioEntry.findMany({
-          where: { kind: "PAGAMENTO", businessDate: byBusinessDate(p), ...(method ? { method } : {}) },
-          orderBy: { createdAt: "asc" },
-          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, installments: true, description: true, createdBy: { select: { fullName: true } }, reservation: { select: { number: true, room: { select: { number: true } }, guest: { select: { fullName: true } } } } },
-        }),
-        db.posPayment.findMany({
-          where: { businessDate: byBusinessDate(p), ...(method ? { method } : {}) },
-          orderBy: { createdAt: "asc" },
-          select: { businessDate: true, createdAt: true, method: true, cardBrand: true, amountCents: true, reference: true, createdBy: { select: { fullName: true } }, comanda: { select: { number: true } } },
-        }),
-      ]);
-      const rows = [
-        ...folio.map((f) => ({
-          dia: toDateStr(f.businessDate),
-          hora: f.createdAt.toISOString(),
-          forma: METHOD[f.method as Method].label,
-          origem: `Quarto ${f.reservation.room?.number ?? "—"} · ${f.reservation.guest.fullName}`,
-          detalhe: f.description + (f.installments && f.installments > 1 ? ` (${f.installments}x)` : ""),
-          bandeira: f.cardBrand,
-          referencia: f.reference,
-          por: f.createdBy?.fullName ?? "—",
-          valor: f.amountCents,
-        })),
-        ...pos.map((x) => ({
-          dia: toDateStr(x.businessDate),
-          hora: x.createdAt.toISOString(),
-          forma: METHOD[x.method as Method].label,
-          origem: `Restaurante comanda nº ${x.comanda.number}`,
-          detalhe: "Pagamento no restaurante",
-          bandeira: x.cardBrand,
-          referencia: x.reference,
-          por: x.createdBy?.fullName ?? "—",
-          valor: x.amountCents,
-        })),
-      ].sort((a, b) => a.hora.localeCompare(b.hora));
-      const byMethod = (Object.keys(METHOD) as Method[])
-        .map((m) => ({ m, v: rows.filter((r) => r.forma === METHOD[m].label).reduce((s, r) => s + r.valor, 0) }))
-        .filter((x) => x.v !== 0);
+      const rows = await receipts(db, p);
+      const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v / 100);
+      const sum = (pred: (r: Receipt) => boolean) => rows.filter(pred).reduce((s, r) => s + r.valor, 0);
+      const byMethod = (Object.keys(METHOD) as Method[]).map((m) => ({ m, v: sum((r) => r.method === m) })).filter((x) => x.v !== 0);
+      const sectors = SECTOR_OPTIONS.map((o) => ({ label: o.label, v: sum((r) => r.setorKey === o.value) })).filter((x) => x.v !== 0);
+      const users = [...new Set(rows.map((r) => r.por))].map((u) => ({ u, v: sum((r) => r.por === u) }));
       return {
         columns: [
           { key: "dia", label: "Dia", type: "date" },
           { key: "hora", label: "Lançado em", type: "datetime" },
+          { key: "setor", label: "Setor" },
           { key: "forma", label: "Forma" },
           { key: "origem", label: "Origem" },
           { key: "detalhe", label: "Detalhe" },
@@ -480,14 +535,13 @@ export const REPORTS: ReportDef[] = [
           { key: "por", label: "Recebido por" },
           { key: "valor", label: "Valor", type: "money", total: true },
         ],
-        rows,
+        rows: rows.map((r) => ({ dia: r.dia, hora: r.hora, setor: r.setor, forma: r.forma, origem: r.origem, detalhe: r.detalhe, bandeira: r.bandeira, referencia: r.referencia, por: r.por, valor: r.valor })),
         summary: [
-          ...byMethod.map((x) => ({ label: METHOD[x.m].label, value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(x.v / 100) })),
+          ...byMethod.map((x) => ({ label: METHOD[x.m].label, value: brl(x.v) })),
           // Cartões por bandeira (para conferir com o extrato da maquininha).
-          ...[...new Set(rows.filter((r) => r.bandeira).map((r) => r.bandeira as string))].map((b) => ({
-            label: `Cartão ${b}`,
-            value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(rows.filter((r) => r.bandeira === b).reduce((s2, r) => s2 + r.valor, 0) / 100),
-          })),
+          ...[...new Set(rows.filter((r) => r.bandeira).map((r) => r.bandeira as string))].map((bd) => ({ label: `Cartão ${bd}`, value: brl(sum((r) => r.bandeira === bd)) })),
+          ...sectors.map((x) => ({ label: `Setor: ${x.label}`, value: brl(x.v) })),
+          ...(users.length > 1 ? users.map((x) => ({ label: `Usuário: ${x.u}`, value: brl(x.v) })) : []),
         ],
         note: "Estornos e devoluções aparecem com valor negativo.",
       };
@@ -496,36 +550,30 @@ export const REPORTS: ReportDef[] = [
   {
     slug: "caixa-por-funcionario",
     title: "Caixa por funcionário",
-    description: "Quanto cada funcionário recebeu no período, por forma de pagamento (fechamento de turno).",
+    description: "Quanto cada funcionário recebeu no período, por setor e forma de pagamento (fechamento de turno).",
     group: "Financeiro",
     roles: [...ALL_FRONT],
     period: "range",
     defaultPeriod: "today",
+    extraFilters: [{ key: "setor", label: "Setor", options: async () => SECTOR_OPTIONS }],
     async run(db, p) {
-      const [folio, pos] = await Promise.all([
-        db.folioEntry.findMany({ where: { kind: "PAGAMENTO", businessDate: byBusinessDate(p) }, select: { method: true, amountCents: true, createdBy: { select: { fullName: true } } } }),
-        db.posPayment.findMany({ where: { businessDate: byBusinessDate(p) }, select: { method: true, amountCents: true, createdBy: { select: { fullName: true } } } }),
-      ]);
-      const map = new Map<string, Record<string, number>>();
-      for (const e of [...folio, ...pos]) {
-        const who = e.createdBy?.fullName ?? "Sistema";
-        const row = map.get(who) ?? {};
-        const m = e.method ?? "DINHEIRO"; // pagamento sempre tem forma (regra do banco)
-        row[m] = (row[m] ?? 0) + e.amountCents;
-        map.set(who, row);
+      const rows = await receipts(db, p);
+      const map = new Map<string, Record<string, string | number>>();
+      for (const r of rows) {
+        const k = `${r.por}|${r.setor}`;
+        const row = map.get(k) ?? { funcionario: r.por, setor: r.setor, total: 0 };
+        row[r.method] = (Number(row[r.method]) || 0) + r.valor;
+        row.total = Number(row.total) + r.valor;
+        map.set(k, row);
       }
-      const methods = Object.keys(METHOD) as Method[];
       return {
         columns: [
           { key: "funcionario", label: "Funcionário" },
-          ...methods.map((m) => ({ key: m, label: METHOD[m].label, type: "money" as const, total: true })),
+          { key: "setor", label: "Setor" },
+          ...(Object.keys(METHOD) as Method[]).map((m) => ({ key: m, label: METHOD[m].label, type: "money" as const, total: true })),
           { key: "total", label: "Total", type: "money", total: true },
         ],
-        rows: [...map.entries()].map(([who, v]) => ({
-          funcionario: who,
-          ...Object.fromEntries(methods.map((m) => [m, v[m] ?? 0])),
-          total: methods.reduce((s, m) => s + (v[m] ?? 0), 0),
-        })),
+        rows: [...map.values()].sort((x, y) => String(x.funcionario).localeCompare(String(y.funcionario), "pt-BR")),
       };
     },
   },

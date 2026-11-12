@@ -22,7 +22,8 @@ export type HotelEvent =
   | { type: "housekeeping.changed"; message?: string } // tarefas de limpeza
   | { type: "maintenance.changed"; message?: string } // ocorrências
   | { type: "reservations.changed" } // reservas, check-in/out, garagem, conta
-  | { type: "restaurant.changed" }; // comandas, cozinha, cardápio
+  | { type: "restaurant.changed" } // comandas, cozinha, cardápio
+  | { type: "requests.changed"; message?: string }; // pedidos dos hóspedes (QR do quarto)
 
 type Hub = { emitter: EventEmitter; ready: Promise<void> | null };
 

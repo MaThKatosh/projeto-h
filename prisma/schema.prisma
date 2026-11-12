@@ -19,49 +19,53 @@ datasource db {
 // no banco: assim a regra é testada e não muda sem querer.
 
 enum Role {
-  ADMIN       // Administrador: tudo, inclusive usuários
-  GERENTE     // Gerente: tudo da operação
-  RECEPCAO    // Recepção: hóspedes, reservas, contas
-  GOVERNANCA  // Governança: limpeza dos quartos
-  MANUTENCAO  // Manutenção: problemas e bloqueios
+  ADMIN // Administrador: tudo, inclusive usuários
+  GERENTE // Gerente: tudo da operação
+  RECEPCAO // Recepção: hóspedes, reservas, contas
+  GOVERNANCA // Governança: limpeza dos quartos
+  MANUTENCAO // Manutenção: problemas e bloqueios
   RESTAURANTE // Restaurante e frigobar
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
   // Login por nome de usuário: nem todo funcionário tem e-mail.
-  username     String   @unique
+  username     String    @unique
   fullName     String
   passwordHash String
   role         Role
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?
   // Idioma escolhido pelo funcionário (null = idioma padrão do hotel).
   locale       String?
 
-  sessions      AuthSession[]
-  auditLogs     AuditLog[]
-  roomChanges   RoomStatusLog[]
+  sessions    AuthSession[]
+  auditLogs   AuditLog[]
+  roomChanges RoomStatusLog[]
 
-  cleaningAssigned  CleaningTask[]      @relation("CleaningAssigned")
-  cleaningFinished  CleaningTask[]      @relation("CleaningFinished")
-  ticketsReported   MaintenanceTicket[] @relation("TicketReporter")
-  ticketsAssigned   MaintenanceTicket[] @relation("TicketAssignee")
-  ticketEvents      TicketEvent[]
+  cleaningAssigned CleaningTask[]      @relation("CleaningAssigned")
+  cleaningFinished CleaningTask[]      @relation("CleaningFinished")
+  ticketsReported  MaintenanceTicket[] @relation("TicketReporter")
+  ticketsAssigned  MaintenanceTicket[] @relation("TicketAssignee")
+  ticketEvents     TicketEvent[]
 
   reservationsCreated Reservation[]      @relation("ReservationCreator")
   reservationEvents   ReservationEvent[]
   roomMoves           RoomMove[]
   folioPosted         FolioEntry[]       @relation("FolioPoster")
+  pendingCreated      PendingAccount[]   @relation("PendingCreator")
+  pendingClosed       PendingAccount[]   @relation("PendingCloser")
+  pendingPayments     PendingPayment[]
+  requestsHandled     GuestRequest[]
   folioReversed       FolioEntry[]       @relation("FolioReverser")
   comandasOpened      Comanda[]          @relation("ComandaOpener")
   comandasClosed      Comanda[]          @relation("ComandaCloser")
   comandaItems        ComandaItem[]
   posPayments         PosPayment[]
-  auditRuns           AuditRun[]       @relation("AuditRunner")
-  auditUndos          AuditRun[]       @relation("AuditUndoer")
+  auditRuns           AuditRun[]         @relation("AuditRunner")
+  auditUndos          AuditRun[]         @relation("AuditUndoer")
 }
 
 model AuthSession {
@@ -131,6 +135,7 @@ model RoomType {
   rooms        Room[]
   prices       RatePrice[]
   reservations Reservation[]
+  revenueRules RevenueRule[]
 }
 
 model Room {
@@ -147,13 +152,17 @@ model Room {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  roomType RoomType            @relation(fields: [roomTypeId], references: [id])
-  history  RoomStatusLog[]
-  cleanings CleaningTask[]
+  roomType     RoomType            @relation(fields: [roomTypeId], references: [id])
+  history      RoomStatusLog[]
+  cleanings    CleaningTask[]
   reservations Reservation[]
-  movesFrom    RoomMove[]   @relation("MoveFrom")
-  movesTo      RoomMove[]   @relation("MoveTo")
-  tickets   MaintenanceTicket[]
+  movesFrom    RoomMove[]          @relation("MoveFrom")
+  movesTo      RoomMove[]          @relation("MoveTo")
+  tickets      MaintenanceTicket[]
+
+  // Código do QR colado no quarto (pedidos do hóspede). null = ainda não gerado.
+  guestToken String?        @unique
+  requests   GuestRequest[]
 
   @@index([floor, number])
 }
@@ -164,7 +173,7 @@ model RoomStatusLog {
   id        String   @id @default(uuid()) @db.Uuid
   roomId    String   @db.Uuid
   userId    String?  @db.Uuid
-  field     String   // "housekeeping" | "maintenance" | "occupancy" | "note"
+  field     String // "housekeeping" | "maintenance" | "occupancy" | "note"
   fromValue String?
   toValue   String?
   createdAt DateTime @default(now())
@@ -241,7 +250,7 @@ model MaintenanceTicket {
   // Número curto para falar no rádio: "ocorrência 12".
   number       Int            @unique @default(autoincrement())
   roomId       String?        @db.Uuid
-  location     String?        // quando não é num quarto
+  location     String? // quando não é num quarto
   title        String
   description  String?
   priority     TicketPriority @default(MEDIA)
@@ -271,7 +280,7 @@ model TicketEvent {
   id        String   @id @default(uuid()) @db.Uuid
   ticketId  String   @db.Uuid
   userId    String?  @db.Uuid
-  type      String   // criada | atribuida | iniciada | aguardando | resolvida | cancelada | reaberta | comentario | fora_de_venda
+  type      String // criada | atribuida | iniciada | aguardando | resolvida | cancelada | reaberta | comentario | fora_de_venda
   message   String?
   createdAt DateTime @default(now())
 
@@ -304,7 +313,7 @@ model Setting {
 model Guest {
   id          String    @id @default(uuid()) @db.Uuid
   fullName    String
-  docType     String?   // CPF | RG | PASSAPORTE | OUTRO
+  docType     String? // CPF | RG | PASSAPORTE | OUTRO
   docNumber   String?
   phone       String?
   email       String?
@@ -313,9 +322,9 @@ model Guest {
   city        String?
   state       String?
   // Ficha Nacional de Registro de Hóspedes (FNRH)
-  gender      String?   // M | F | OUTRO
+  gender      String? // M | F | OUTRO
   profession  String?
-  docIssuer   String?   // órgão emissor / país do passaporte
+  docIssuer   String? // órgão emissor / país do passaporte
   address     String?
   zipCode     String?
   country     String?
@@ -325,6 +334,7 @@ model Guest {
 
   reservations Reservation[]
   companionOf  ReservationGuest[]
+  pending      PendingAccount[]
 
   @@index([fullName])
   @@index([docNumber])
@@ -356,10 +366,10 @@ model RatePrice {
 
 enum ReservationStatus {
   CONFIRMADA // ainda não chegou
-  HOSPEDADA  // fez check-in: está na casa
+  HOSPEDADA // fez check-in: está na casa
   FINALIZADA // fez check-out
   CANCELADA
-  NO_SHOW    // não apareceu
+  NO_SHOW // não apareceu
 }
 
 enum ReservationSource {
@@ -378,37 +388,37 @@ enum ReservationSource {
 }
 
 model Reservation {
-  id             String            @id @default(uuid()) @db.Uuid
-  number         Int               @unique @default(autoincrement())
-  status         ReservationStatus @default(CONFIRMADA)
-  guestId        String            @db.Uuid
-  roomTypeId     String            @db.Uuid
+  id              String            @id @default(uuid()) @db.Uuid
+  number          Int               @unique @default(autoincrement())
+  status          ReservationStatus @default(CONFIRMADA)
+  guestId         String            @db.Uuid
+  roomTypeId      String            @db.Uuid
   // Quarto escolhido. Obrigatório a partir do check-in.
-  roomId         String?           @db.Uuid
-  checkIn        DateTime          @db.Date
-  checkOut       DateTime          @db.Date
-  adults         Int               @default(1)
-  children       Int               @default(0)
-  ratePlanId     String?           @db.Uuid
+  roomId          String?           @db.Uuid
+  checkIn         DateTime          @db.Date
+  checkOut        DateTime          @db.Date
+  adults          Int               @default(1)
+  children        Int               @default(0)
+  ratePlanId      String?           @db.Uuid
   // Valores combinados (copiados da tarifa, podem ser alterados).
-  dailyCents     Int
-  breakfast      Boolean           @default(true)
-  chargeIss      Boolean           @default(false)
-  issBasisPoints Int               @default(0)
-  source         ReservationSource @default(BALCAO)
-  externalCode   String?           // nº da reserva no portal
+  dailyCents      Int
+  breakfast       Boolean           @default(true)
+  chargeIss       Boolean           @default(false)
+  issBasisPoints  Int               @default(0)
+  source          ReservationSource @default(BALCAO)
+  externalCode    String? // nº da reserva no portal
   // Dados da viagem para a FNRH (preenchidos no check-in).
   travelPurpose   String?
   transport       String?
   arrivingFrom    String?
   nextDestination String?
-  notes          String?
-  cancelReason   String?
-  createdById    String?           @db.Uuid
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  checkedInAt    DateTime?
-  checkedOutAt   DateTime?
+  notes           String?
+  cancelReason    String?
+  createdById     String?           @db.Uuid
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  checkedInAt     DateTime?
+  checkedOutAt    DateTime?
 
   guest      Guest              @relation(fields: [guestId], references: [id])
   roomType   RoomType           @relation(fields: [roomTypeId], references: [id])
@@ -420,6 +430,8 @@ model Reservation {
   moves      RoomMove[]
   vehicles   Vehicle[]
   folio      FolioEntry[]
+  pending    PendingAccount[]
+  requests   GuestRequest[]
   comandas   Comanda[]
 
   @@index([status, checkIn])
@@ -482,7 +494,7 @@ model Vehicle {
   plate         String
   model         String?
   color         String?
-  spot          String?   // vaga
+  spot          String? // vaga
   enteredAt     DateTime  @default(now())
   exitedAt      DateTime?
 
@@ -508,6 +520,8 @@ model Vehicle {
 enum FolioKind {
   COBRANCA
   PAGAMENTO
+  // Parte da conta enviada para uma conta pendente (hóspede saiu devendo).
+  PENDENTE
 }
 
 enum ChargeCategory {
@@ -535,26 +549,26 @@ model FolioEntry {
   reservationId String          @db.Uuid
   kind          FolioKind
   category      ChargeCategory? // cobranças
-  method        PaymentMethod?  // pagamentos
+  method        PaymentMethod? // pagamentos
   description   String
   quantity      Int             @default(1)
   unitCents     Int?
-  amountCents   Int             // negativo = estorno ou devolução
+  amountCents   Int // negativo = estorno ou devolução
   // Noite a que a diária/ISS/estacionamento se refere (evita lançar duas vezes).
   nightDate     DateTime?       @db.Date
-  reference     String?         // NSU, autorização, ID do Pix (NUNCA número de cartão)
+  reference     String? // NSU, autorização, ID do Pix (NUNCA número de cartão)
   installments  Int?
   isRefund      Boolean         @default(false) // devolução de crédito ao hóspede
-  cardBrand     String?         // bandeira do cartão (crédito/débito)
-  auditRunId    String?         @db.Uuid        // lançado pela auditoria noturna
+  cardBrand     String? // bandeira do cartão (crédito/débito)
+  auditRunId    String?         @db.Uuid // lançado pela auditoria noturna
   businessDate  DateTime        @db.Date
   createdById   String?         @db.Uuid
   createdAt     DateTime        @default(now())
 
   // Estorno
-  reversalOfId  String?         @unique @db.Uuid
+  reversalOfId  String?   @unique @db.Uuid
   reversedAt    DateTime?
-  reversedById  String?         @db.Uuid
+  reversedById  String?   @db.Uuid
   reverseReason String?
 
   reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
@@ -581,7 +595,7 @@ model MenuItem {
   id         String   @id @default(uuid()) @db.Uuid
   outlet     Outlet
   name       String
-  group      String   // "Bebidas", "Pratos", "Sobremesas"...
+  group      String // "Bebidas", "Pratos", "Sobremesas"...
   priceCents Int
   // Vai para a tela da cozinha? (bebida pronta não precisa)
   kitchen    Boolean  @default(true)
@@ -612,28 +626,28 @@ enum ComandaStatus {
 
 enum ComandaSettlement {
   QUARTO // lançada na conta do quarto
-  PAGO   // paga no restaurante
+  PAGO // paga no restaurante
 }
 
 // Comanda = a conta de uma mesa, do balcão ou do serviço de quarto.
 model Comanda {
-  id             String             @id @default(uuid()) @db.Uuid
-  number         Int                @unique @default(autoincrement())
-  status         ComandaStatus      @default(ABERTA)
-  tableId        String?            @db.Uuid
+  id            String             @id @default(uuid()) @db.Uuid
+  number        Int                @unique @default(autoincrement())
+  status        ComandaStatus      @default(ABERTA)
+  tableId       String?            @db.Uuid
   // Hóspede ligado (serviço de quarto ou quem vai lançar no quarto).
-  reservationId  String?            @db.Uuid
-  customerName   String?
-  people         Int                @default(1)
-  serviceFee     Boolean            @default(true)
-  serviceFeeBp   Int                @default(1000) // 1000 = 10%
-  settlement     ComandaSettlement?
-  totalCents     Int?               // gravado ao fechar
-  cancelReason   String?
-  openedById     String?            @db.Uuid
-  closedById     String?            @db.Uuid
-  openedAt       DateTime           @default(now())
-  closedAt       DateTime?
+  reservationId String?            @db.Uuid
+  customerName  String?
+  people        Int                @default(1)
+  serviceFee    Boolean            @default(true)
+  serviceFeeBp  Int                @default(1000) // 1000 = 10%
+  settlement    ComandaSettlement?
+  totalCents    Int? // gravado ao fechar
+  cancelReason  String?
+  openedById    String?            @db.Uuid
+  closedById    String?            @db.Uuid
+  openedAt      DateTime           @default(now())
+  closedAt      DateTime?
 
   table       DiningTable?  @relation(fields: [tableId], references: [id])
   reservation Reservation?  @relation(fields: [reservationId], references: [id])
@@ -647,8 +661,8 @@ model Comanda {
 }
 
 enum ItemStatus {
-  PENDENTE  // pedido feito, cozinha ainda não terminou
-  PRONTO    // cozinha terminou, falta levar
+  PENDENTE // pedido feito, cozinha ainda não terminou
+  PRONTO // cozinha terminou, falta levar
   ENTREGUE
   CANCELADO
 }
@@ -657,10 +671,10 @@ model ComandaItem {
   id           String     @id @default(uuid()) @db.Uuid
   comandaId    String     @db.Uuid
   menuItemId   String     @db.Uuid
-  name         String     // cópia do nome no momento do pedido
-  unitCents    Int        // cópia do preço no momento do pedido
+  name         String // cópia do nome no momento do pedido
+  unitCents    Int // cópia do preço no momento do pedido
   quantity     Int
-  notes        String?    // "sem cebola"
+  notes        String? // "sem cebola"
   kitchen      Boolean
   status       ItemStatus @default(PENDENTE)
   cancelReason String?
@@ -704,25 +718,25 @@ model PosPayment {
 // dia (ocupação, receita) e vira a data do sistema. Uma por dia.
 
 model AuditRun {
-  id              String   @id @default(uuid()) @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
   // Uma auditoria VÁLIDA por dia (índice parcial na migration: ignora as desfeitas).
-  businessDate    DateTime @db.Date         // dia que foi fechado
-  nextDate        DateTime @db.Date         // nova data do sistema
-  userId          String?  @db.Uuid
-  startedAt       DateTime @default(now())
-  finishedAt      DateTime?
-  nightsPosted    Int      @default(0)
-  nightsCents     Int      @default(0)      // diárias + ISS + garagem lançados pela auditoria
-  roomsOccupied   Int      @default(0)
-  roomsAvailable  Int      @default(0)      // ativos e não bloqueados/em manutenção
-  guests          Int      @default(0)
-  lodgingCents    Int      @default(0)      // receita de diárias do dia (para diária média)
-  revenueCents    Int      @default(0)      // todas as cobranças do dia
-  receivedCents   Int      @default(0)      // todos os pagamentos do dia (quartos + restaurante)
-  summary         Json?
-  undoneAt        DateTime?
-  undoneById      String?  @db.Uuid
-  undoReason      String?
+  businessDate   DateTime  @db.Date // dia que foi fechado
+  nextDate       DateTime  @db.Date // nova data do sistema
+  userId         String?   @db.Uuid
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  nightsPosted   Int       @default(0)
+  nightsCents    Int       @default(0) // diárias + ISS + garagem lançados pela auditoria
+  roomsOccupied  Int       @default(0)
+  roomsAvailable Int       @default(0) // ativos e não bloqueados/em manutenção
+  guests         Int       @default(0)
+  lodgingCents   Int       @default(0) // receita de diárias do dia (para diária média)
+  revenueCents   Int       @default(0) // todas as cobranças do dia
+  receivedCents  Int       @default(0) // todos os pagamentos do dia (quartos + restaurante)
+  summary        Json?
+  undoneAt       DateTime?
+  undoneById     String?   @db.Uuid
+  undoReason     String?
 
   user     User?        @relation("AuditRunner", fields: [userId], references: [id], onDelete: SetNull)
   undoneBy User?        @relation("AuditUndoer", fields: [undoneById], references: [id], onDelete: SetNull)
@@ -740,4 +754,127 @@ model CardBrand {
   name      String  @unique // "Visa", "Mastercard", "Elo"...
   active    Boolean @default(true)
   sortOrder Int     @default(0)
+}
+
+// ================================================================
+// CONTAS PENDENTES — hóspede saiu devendo (ex.: frigobar). O quarto é
+// liberado e o valor fica aqui até ser recebido ou baixado como perda.
+// ================================================================
+
+enum PendingStatus {
+  ABERTA
+  QUITADA
+  BAIXADA // perda: não será cobrada
+}
+
+model PendingAccount {
+  id            String        @id @default(uuid()) @db.Uuid
+  number        Int           @unique @default(autoincrement())
+  reservationId String        @db.Uuid
+  guestId       String        @db.Uuid
+  amountCents   Int
+  // Cobranças que foram para a pendente: [{ description, amountCents }]
+  items         Json
+  reason        String
+  status        PendingStatus @default(ABERTA)
+  businessDate  DateTime      @db.Date
+  createdById   String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+  closedAt      DateTime?
+  closedById    String?       @db.Uuid
+  closeReason   String?
+
+  reservation Reservation      @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  guest       Guest            @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  createdBy   User?            @relation("PendingCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  closedBy    User?            @relation("PendingCloser", fields: [closedById], references: [id], onDelete: SetNull)
+  payments    PendingPayment[]
+
+  @@index([status])
+  @@index([guestId])
+}
+
+model PendingPayment {
+  id               String        @id @default(uuid()) @db.Uuid
+  pendingAccountId String        @db.Uuid
+  method           PaymentMethod
+  cardBrand        String?
+  amountCents      Int
+  reference        String? // NSU / ID do Pix (NUNCA número de cartão)
+  businessDate     DateTime      @db.Date
+  createdById      String?       @db.Uuid
+  createdAt        DateTime      @default(now())
+
+  pendingAccount PendingAccount @relation(fields: [pendingAccountId], references: [id], onDelete: Restrict)
+  createdBy      User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessDate])
+}
+
+// ================================================================
+// PEDIDOS DOS HÓSPEDES — pelo QR code colado no quarto
+// ================================================================
+
+enum GuestRequestType {
+  LIMPEZA
+  TOALHAS
+  AMENIDADES
+  PROBLEMA
+  OUTRO
+}
+
+enum GuestRequestStatus {
+  ABERTO
+  EM_ANDAMENTO
+  CONCLUIDO
+}
+
+model GuestRequest {
+  id            String             @id @default(uuid()) @db.Uuid
+  number        Int                @unique @default(autoincrement())
+  roomId        String             @db.Uuid
+  reservationId String?            @db.Uuid
+  type          GuestRequestType
+  message       String?
+  status        GuestRequestStatus @default(ABERTO)
+  ticketNumber  Int? // ocorrência aberta na manutenção (problemas)
+  createdAt     DateTime           @default(now())
+  handledById   String?            @db.Uuid
+  handledAt     DateTime?
+  doneAt        DateTime?
+
+  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  handledBy   User?        @relation(fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([roomId, createdAt])
+}
+
+// ================================================================
+// REVENUE MANAGEMENT — regras que ajustam o preço sugerido
+// ================================================================
+
+enum RevenueRuleKind {
+  OCUPACAO // ocupação prevista da noite >= X%
+  DIA_SEMANA // dias da semana escolhidos
+  PERIODO // de uma data a outra (temporada, eventos)
+  ANTECEDENCIA // faltam no máximo X dias para a noite (última hora)
+}
+
+model RevenueRule {
+  id         String          @id @default(uuid()) @db.Uuid
+  name       String
+  kind       RevenueRuleKind
+  // OCUPACAO: { minOccupancy } · DIA_SEMANA: { days: [0-6] } ·
+  // PERIODO: { from, to } · ANTECEDENCIA: { maxDaysAhead }
+  params     Json
+  // Ajuste em centésimos de %: 1500 = +15%, -1000 = -10%
+  adjustBp   Int
+  roomTypeId String?         @db.Uuid // null = todos os tipos
+  active     Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  roomType RoomType? @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 }

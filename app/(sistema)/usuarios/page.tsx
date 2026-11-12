@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { INTEGRATION_USERNAME } from "@/lib/integrations/service";
+import { SYSTEM_USERNAMES } from "@/lib/system-users";
 import { requirePermission } from "@/lib/auth/dal";
 import { canManageRole, manageableRoles, ROLE_LABEL, ROLE_LEVEL, type Role } from "@/lib/permissions";
 import { NewUserForm, UserRow } from "./forms";
@@ -11,7 +11,7 @@ export default async function UsuariosPage() {
   const tr = await getT();
   const { user: me } = await requirePermission("users.manage");
   const users = await getDb().user.findMany({
-    where: { username: { not: INTEGRATION_USERNAME } },
+    where: { username: { notIn: SYSTEM_USERNAMES } },
     select: { id: true, username: true, fullName: true, role: true, active: true, lastLoginAt: true },
   });
   users.sort((a, b) => ROLE_LEVEL[b.role] - ROLE_LEVEL[a.role] || a.fullName.localeCompare(b.fullName, "pt-BR"));

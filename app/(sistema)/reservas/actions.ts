@@ -13,6 +13,7 @@ import type { RoomView } from "@/lib/rooms/service";
 import { searchGuests } from "@/lib/guests/service";
 import * as svc from "@/lib/reservations/service";
 import * as folio from "@/lib/folio/service";
+import { sendToPending } from "@/lib/pending/service";
 
 export type ActionResult = { ok: boolean; error?: string; fieldErrors?: FieldErrors; id?: string; number?: number };
 
@@ -163,6 +164,11 @@ export async function addChargeAction(reservationId: string, input: unknown) {
 
 export async function addPaymentAction(reservationId: string, input: unknown) {
   return run((db, u) => folio.addPayment(db, u, reservationId, input));
+}
+
+// Hóspede sai devendo: cobranças escolhidas viram conta pendente.
+export async function sendToPendingAction(reservationId: string, input: unknown) {
+  return run((db, u) => sendToPending(db, u, reservationId, input));
 }
 
 export async function refundAction(reservationId: string, input: unknown) {

@@ -16,7 +16,7 @@ export default async function RelatorioPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ de?: string; ate?: string; filtro?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const tr = await getT();
   const { user } = await verifySession();
@@ -24,9 +24,13 @@ export default async function RelatorioPage({
   const query = await searchParams;
   const data = await runReport(getDb(), user.role, slug, query);
   if (!data) notFound();
-  const { def, from, to, filter, result } = data;
+  const { def, from, to, filter, extra, extraOptions, result } = data;
   const t = totals(result);
-  const qs = new URLSearchParams({ de: from, ate: to, ...(filter ? { filtro: filter } : {}) }).toString();
+  const qs = new URLSearchParams({ de: from, ate: to, ...(filter ? { filtro: filter } : {}), ...extra }).toString();
+  const extraText = extraOptions
+    .filter((f) => extra[f.key])
+    .map((f) => `${tr(f.label)}: ${tr(f.options.find((o) => o.value === extra[f.key])?.label ?? "")}`)
+    .join(" · ");
   const period = def.period === "none" ? tr("agora") : def.period === "day" ? formatDate(from, true) : from === to ? formatDate(from, true) : tr("{0} a {1}", [formatDate(from, true), formatDate(to, true)]);
 
   return (
@@ -66,6 +70,17 @@ export default async function RelatorioPage({
               </select>
             </label>
           )}
+          {extraOptions.map((f) => (
+            <label key={f.key}>
+              <span className="text-xs text-zinc-500">{tr(f.label)}</span>
+              <select name={f.key} defaultValue={extra[f.key] ?? ""} className="field">
+                <option value="">{tr("Todos")}</option>
+                {f.options.map((o) => (
+                  <option key={o.value} value={o.value}>{tr(o.label)}</option>
+                ))}
+              </select>
+            </label>
+          ))}
           <button className="btn-primary">{tr("Ver")}</button>
         </form>
       )}
@@ -73,7 +88,7 @@ export default async function RelatorioPage({
       {/* Cabeçalho que só aparece na impressão */}
       <div className="print-only">
         <h1 className="text-xl font-bold">{tr(def.title)}</h1>
-        <p className="text-sm">{tr("Período: {0}{1} · emitido por {2} em", [period, filter ? " · " + tr(def.filter?.options.find((o) => o.value === filter)?.label) : "", user.fullName])}{" "}{dateTime(data.generatedAt)}</p>
+        <p className="text-sm">{tr("Período: {0}{1} · emitido por {2} em", [period, (filter ? " · " + tr(def.filter?.options.find((o) => o.value === filter)?.label) : "") + (extraText ? " · " + extraText : ""), user.fullName])}{" "}{dateTime(data.generatedAt)}</p>
       </div>
 
       {result.summary && result.summary.length > 0 && (

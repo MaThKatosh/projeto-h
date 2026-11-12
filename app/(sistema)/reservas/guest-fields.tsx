@@ -5,25 +5,59 @@ import type { FieldErrors } from "@/lib/auth/validation";
 import type { GuestView } from "@/lib/guests/service";
 import { GENDERS, GENDER_LABEL, PURPOSE_LABEL, TRANSPORT_LABEL, TRANSPORTS, TRAVEL_PURPOSES, type TripInput } from "@/lib/guests/fnrh";
 
-import { useT } from "@/components/i18n";
+import { useRef, useState } from "react";
+import { useLocale, useT } from "@/components/i18n";
+import { countryOptions } from "@/lib/guests/countries";
+
+// Dados que costumam ser iguais para a família toda.
+const SHARED = ["phone", "email", "address", "zipCode", "city", "state", "country"] as const;
+
 // Campos do hóspede (não controlados). Lidos com readGuest(form, prefixo).
+// copyFrom: prefixo de outra ficha no mesmo formulário (ex.: "g_" = titular)
+// → mostra o botão "copiar do titular".
 export function GuestFields({
   prefix = "g_",
   initial,
   errors,
   requireDoc,
   compact,
+  copyFrom,
+  copyValues,
 }: {
   prefix?: string;
   initial?: Partial<GuestView>;
   errors?: FieldErrors;
   requireDoc?: boolean;
   compact?: boolean;
+  copyFrom?: string;
+  copyValues?: Partial<GuestView>;
 }) {
   const tr = useT();
+  const locale = useLocale();
+  const box = useRef<HTMLDivElement>(null);
   const n = (k: string) => `${prefix}${k}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const minBirth = `${new Date().getFullYear() - 120}-01-01`;
+
+  function copy() {
+    const form = box.current?.closest("form");
+    if (!form) return;
+    for (const k of SHARED) {
+      const from = copyFrom ? (form.elements.namedItem(`${copyFrom}${k}`) as HTMLInputElement | HTMLSelectElement | null)?.value : copyValues?.[k];
+      const to = form.elements.namedItem(n(k)) as HTMLInputElement | HTMLSelectElement | null;
+      if (from && to) to.value = from;
+    }
+  }
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div ref={box} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {(copyFrom || copyValues) && (
+        <div className="sm:col-span-2 lg:col-span-4">
+          <button type="button" className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50" onClick={copy}>
+            {tr("⧉ Copiar telefone, e-mail e endereço do titular")}
+          </button>
+        </div>
+      )}
       <label className="sm:col-span-2">
         <span className="text-xs text-zinc-500">{tr("Nome completo *")}</span>
         <input name={n("fullName")} className="field" defaultValue={initial?.fullName} required />
@@ -35,7 +69,7 @@ export function GuestFields({
           <option value="CPF">{tr("CPF")}</option>
           <option value="RG">{tr("RG")}</option>
           <option value="PASSAPORTE">{tr("Passaporte")}</option>
-          <option value="OUTRO">{tr("Outro")}</option>
+          <option value="OUTRO">{tr("Outro (certidão, RNE...)")}</option>
         </select>
       </label>
       <label>
@@ -55,25 +89,21 @@ export function GuestFields({
       {!compact && (
         <>
           <label>
-            <span className="text-xs text-zinc-500">{tr("Nascimento")}</span>
-            <input name={n("birthDate")} type="date" className="field" defaultValue={initial?.birthDate ?? ""} />
+            <span className="text-xs text-zinc-500">{tr("Nascimento")}{requireDoc ? " *" : ""}</span>
+            <input name={n("birthDate")} type="date" className="field" min={minBirth} max={today} defaultValue={initial?.birthDate ?? ""} required={requireDoc} />
             <FieldError messages={errors?.birthDate} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">{tr("Nacionalidade")}</span>
-            <input name={n("nationality")} className="field" defaultValue={initial?.nationality ?? "Brasileira"} />
+            <span className="text-xs text-zinc-500">{tr("Nacionalidade")}{requireDoc ? " *" : ""}</span>
+            <select name={n("nationality")} className="field" defaultValue={initial?.nationality === "Brasileira" || !initial?.nationality ? "Brasil" : initial.nationality}>
+              {countryOptions(locale, initial?.nationality === "Brasileira" ? null : initial?.nationality).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </label>
           <label>
-            <span className="text-xs text-zinc-500">{tr("Cidade")}</span>
-            <input name={n("city")} className="field" defaultValue={initial?.city ?? ""} />
-          </label>
-          <label>
-            <span className="text-xs text-zinc-500">{tr("Estado")}</span>
-            <input name={n("state")} className="field" defaultValue={initial?.state ?? ""} maxLength={30} />
-          </label>
-          <label>
-            <span className="text-xs text-zinc-500">{tr("Sexo")}</span>
-            <select name={n("gender")} className="field" defaultValue={initial?.gender ?? ""}>
+            <span className="text-xs text-zinc-500">{tr("Sexo")}{requireDoc ? " *" : ""}</span>
+            <select name={n("gender")} className="field" defaultValue={initial?.gender ?? ""} required={requireDoc}>
               <option value="">—</option>
               {GENDERS.map((g) => <option key={g} value={g}>{tr(GENDER_LABEL[g])}</option>)}
             </select>
@@ -87,16 +117,29 @@ export function GuestFields({
             <input name={n("docIssuer")} className="field" defaultValue={initial?.docIssuer ?? ""} maxLength={40} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">{tr("País de residência")}</span>
-            <input name={n("country")} className="field" defaultValue={initial?.country ?? "Brasil"} maxLength={40} />
+            <span className="text-xs text-zinc-500">{tr("País de residência")}{requireDoc ? " *" : ""}</span>
+            <select name={n("country")} className="field" defaultValue={initial?.country || "Brasil"}>
+              {countryOptions(locale, initial?.country).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </label>
-          <label className="sm:col-span-2 lg:col-span-3">
+          <label>
+            <span className="text-xs text-zinc-500">{tr("CEP")}</span>
+            <input name={n("zipCode")} className="field" inputMode="numeric" placeholder="00000-000" defaultValue={initial?.zipCode ?? ""} maxLength={12} />
+            <FieldError messages={errors?.zipCode} />
+          </label>
+          <label className="sm:col-span-2">
             <span className="text-xs text-zinc-500">{tr("Endereço (rua, número, bairro)")}</span>
             <input name={n("address")} className="field" defaultValue={initial?.address ?? ""} maxLength={160} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">{tr("CEP")}</span>
-            <input name={n("zipCode")} className="field" inputMode="numeric" defaultValue={initial?.zipCode ?? ""} maxLength={12} />
+            <span className="text-xs text-zinc-500">{tr("Cidade")}{requireDoc ? " *" : ""}</span>
+            <input name={n("city")} className="field" defaultValue={initial?.city ?? ""} required={requireDoc} />
+          </label>
+          <label>
+            <span className="text-xs text-zinc-500">{tr("Estado")}</span>
+            <input name={n("state")} className="field" defaultValue={initial?.state ?? ""} maxLength={30} />
           </label>
         </>
       )}
@@ -205,4 +248,50 @@ export function readVehicle(form: HTMLFormElement, prefix = "v_") {
     color: String(f.get(`${prefix}color`) ?? ""),
     spot: String(f.get(`${prefix}spot`) ?? ""),
   };
+}
+
+// Fichas dos acompanhantes (check-in e entrada direta). Os já cadastrados
+// vêm preenchidos; completa com fichas em branco até o número de pessoas.
+export function CompanionsFields({ existing = [], people }: { existing?: GuestView[]; people: number }) {
+  const tr = useT();
+  const [extra, setExtra] = useState(0);
+  const blanks = Math.max(0, people - 1 - existing.length) + extra;
+  const total = existing.length + blanks;
+  if (total === 0) {
+    return (
+      <button type="button" className="text-sm text-blue-700 underline" onClick={() => setExtra(1)}>
+        {tr("+ incluir acompanhante")}
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: total }, (_, i) => {
+        const g = existing[i];
+        return (
+          <fieldset key={g?.id ?? `novo-${i}`} className="rounded-lg border border-zinc-200 p-3">
+            <legend className="px-1 text-sm font-semibold">{tr("Acompanhante {0}", [i + 1])}</legend>
+            {g && <input type="hidden" name={`c${i}_id`} value={g.id} />}
+            <GuestFields prefix={`c${i}_`} initial={g} errors={undefined} requireDoc copyFrom="g_" />
+          </fieldset>
+        );
+      })}
+      <button type="button" className="text-sm text-blue-700 underline" onClick={() => setExtra((x) => x + 1)}>
+        {tr("+ incluir outro acompanhante")}
+      </button>
+    </div>
+  );
+}
+
+// Lê todas as fichas de acompanhantes do formulário (c0_, c1_, ...).
+export function readCompanions(form: HTMLFormElement) {
+  const out: (ReturnType<typeof readGuest> & { id?: string })[] = [];
+  for (let i = 0; form.elements.namedItem(`c${i}_fullName`); i++) {
+    const g = readGuest(form, `c${i}_`);
+    const id = (form.elements.namedItem(`c${i}_id`) as HTMLInputElement | null)?.value;
+    // ficha em branco (sem nome) é ignorada; o servidor confere se falta alguém
+    if (!g.fullName.trim() && !id) continue;
+    out.push(id ? { ...g, id } : g);
+  }
+  return out;
 }

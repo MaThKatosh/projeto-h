@@ -27,7 +27,11 @@ export type ReportResult = {
   note?: string;
 };
 
-export type ReportParams = { from: DateStr; to: DateStr; today: DateStr; filter?: string };
+export type ReportParams = { from: DateStr; to: DateStr; today: DateStr; filter?: string; extra?: Record<string, string> };
+
+export type FilterOption = { value: string; label: string };
+// Filtro a mais, com opções que podem vir do banco (ex.: lista de usuários).
+export type ExtraFilter = { key: string; label: string; options: (db: Db) => Promise<FilterOption[]> };
 
 export type ReportDef = {
   slug: string;
@@ -39,6 +43,7 @@ export type ReportDef = {
   period: "none" | "day" | "range";
   defaultPeriod?: "today" | "tomorrow" | "last7" | "month";
   filter?: { label: string; options: { value: string; label: string }[] };
+  extraFilters?: ExtraFilter[];
   run: (db: Db, p: ReportParams) => Promise<ReportResult>;
 };
 

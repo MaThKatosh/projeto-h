@@ -10,7 +10,9 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasToken = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
 
-  if (!hasToken && !PUBLIC_PATHS.includes(pathname)) {
+  // /hospede/<código>: página do QR do quarto, para o hóspede (sem login).
+  const isPublic = PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/hospede/");
+  if (!hasToken && !isPublic) {
     return NextResponse.redirect(new URL("/entrar", request.url));
   }
   return NextResponse.next();

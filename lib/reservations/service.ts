@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parkingFull } from "@/lib/settings";
 import type { Db } from "@/lib/db-types";
 import type { Failure, SessionUser } from "@/lib/auth/service";
 import { fieldErrors } from "@/lib/auth/validation";
@@ -9,7 +10,7 @@ import { formatBRL } from "@/lib/money";
 import { getBusinessDate } from "@/lib/hotel-date";
 import { applyRoomChanges, type RoomView } from "@/lib/rooms/service";
 import { guestData, guestSelect, toGuestView, type GuestView } from "@/lib/guests/service";
-import { tripSchema, type TripInput } from "@/lib/guests/fnrh";
+import { missingFnrh, tripSchema, type TripInput } from "@/lib/guests/fnrh";
 import { checkoutBlocker } from "@/lib/folio/service";
 import { effectiveCheckOut, folioTotals } from "@/lib/folio/rules";
 import {
@@ -23,6 +24,7 @@ import {
   type ReservationStatus,
   type Source,
   type StayInput,
+  type GuestInput,
 } from "@/lib/reservations/rules";
 
 // ================================================================
@@ -639,7 +641,21 @@ const checkInSchema = z.object({
   guest: guestSchema,
   vehicle: vehicleSchema.optional(),
   trip: tripSchema.optional(),
+  // Fichas dos acompanhantes (com id = já cadastrado nesta reserva).
+  companions: z.array(z.unknown()).max(20).optional(),
 });
+
+// Campo da ficha que corresponde a cada pendência (para destacar no formulário).
+const MISSING_FIELD: Record<string, string> = {
+  "nome e sobrenome": "fullName",
+  documento: "docNumber",
+  nascimento: "birthDate",
+  nacionalidade: "nationality",
+  sexo: "gender",
+  "país de residência": "country",
+  cidade: "city",
+  estado: "state",
+};
 
 export async function checkIn(db: Db, actor: SessionUser, id: string, input: unknown): Promise<Result<Rooms>> {
   const no = denied(actor);
@@ -648,15 +664,43 @@ export async function checkIn(db: Db, actor: SessionUser, id: string, input: unk
   if (!parsed.success) return invalid(parsed.error);
   const { roomId, guest, vehicle, trip } = parsed.data;
 
-  if (!guest.docNumber) {
-    return { ok: false, error: "Revise os campos destacados.", fieldErrors: { docNumber: ["Documento obrigatório no check-in (ficha do hóspede)."] } };
+  // Ficha do titular completa (FNRH).
+  const holderMissing = missingFnrh(guest);
+  if (holderMissing.length) {
+    return {
+      ok: false,
+      error: "Complete a ficha do titular para fazer o check-in.",
+      fieldErrors: Object.fromEntries(holderMissing.map((m) => [MISSING_FIELD[m] ?? "fullName", ["Obrigatório no check-in."]])),
+    };
   }
 
   const r = await db.reservation.findUnique({
     where: { id },
-    select: { status: true, checkIn: true, checkOut: true, roomTypeId: true, guestId: true },
+    select: { status: true, checkIn: true, checkOut: true, roomTypeId: true, guestId: true, adults: true, children: true, companions: { select: { guest: { select: guestSelect } } } },
   });
   if (!r || r.status !== "CONFIRMADA") return { ok: false, error: "Esta reserva não está aguardando check-in." };
+
+  // Fichas dos acompanhantes: as enviadas agora + as já cadastradas.
+  const sent: { id?: string; data: GuestInput }[] = [];
+  for (const [i, raw] of (parsed.data.companions ?? []).entries()) {
+    const c = guestSchema.safeParse(raw);
+    if (!c.success) return { ok: false, error: `Acompanhante ${i + 1}: ${c.error.issues[0].message}` };
+    const miss = missingFnrh(c.data);
+    if (miss.length) return { ok: false, error: `Acompanhante ${i + 1} (${c.data.fullName || "sem nome"}): falta ${miss.join(", ")}.` };
+    const cid = (raw as { id?: unknown })?.id;
+    if (typeof cid === "string" && !r.companions.some((x) => x.guest.id === cid)) return { ok: false, error: "Acompanhante não pertence a esta reserva." };
+    sent.push({ id: typeof cid === "string" ? cid : undefined, data: c.data });
+  }
+  for (const c of r.companions) {
+    if (sent.some((x) => x.id === c.guest.id)) continue;
+    const miss = missingFnrh(toGuestView(c.guest));
+    if (miss.length) return { ok: false, error: `Ficha de ${c.guest.fullName} incompleta: falta ${miss.join(", ")}.` };
+  }
+  const people = r.adults + r.children;
+  const registered = 1 + r.companions.length + sent.filter((x) => !x.id).length;
+  if (registered < people) {
+    return { ok: false, error: `A reserva é para ${people} pessoa(s) e há ${registered} ficha(s). Preencha a ficha de todos para fazer o check-in.` };
+  }
 
   const today = await getBusinessDate(db);
   const checkInDate = toDateStr(r.checkIn);
@@ -680,6 +724,14 @@ export async function checkIn(db: Db, actor: SessionUser, id: string, input: unk
   }
 
   await db.guest.update({ where: { id: r.guestId }, data: guestData(guest) });
+  for (const c of sent) {
+    if (c.id) {
+      await db.guest.update({ where: { id: c.id }, data: guestData(c.data) });
+    } else {
+      const g = await db.guest.create({ data: guestData(c.data), select: { id: true } });
+      await db.reservationGuest.create({ data: { reservationId: id, guestId: g.id } });
+    }
+  }
   try {
     await db.reservation.update({
       where: { id },
@@ -690,7 +742,11 @@ export async function checkIn(db: Db, actor: SessionUser, id: string, input: unk
     if (msg) return { ok: false, error: msg };
     throw error;
   }
-  if (vehicle) await db.vehicle.create({ data: { ...vehicle, reservationId: id } });
+  if (vehicle) {
+    const full = await parkingFull(db);
+    if (full) throw new Error(`${full} Faça o check-in sem o veículo ou libere uma vaga.`); // desfaz o check-in inteiro
+    await db.vehicle.create({ data: { ...vehicle, reservationId: id } });
+  }
 
   const updated = await applyRoomChanges(db, actor, roomId, { occupancy: "OCUPADO" });
   await event(db, id, actor.id, "checkin", `Quarto ${room.number}${vehicle ? ` · veículo ${vehicle.plate}` : ""}`);
@@ -723,6 +779,7 @@ export async function walkIn(db: Db, actor: SessionUser, input: unknown): Promis
     guest: raw.guest,
     vehicle: (input as { vehicle?: unknown }).vehicle,
     trip: (input as { trip?: unknown }).trip,
+    companions: (input as { companions?: unknown }).companions,
   });
   if (!done.ok) throw new Error(done.error); // desfaz a transação inteira
   return { ok: true, id: created.id, rooms: done.rooms };
@@ -823,6 +880,8 @@ export async function addVehicle(db: Db, actor: SessionUser, reservationId: stri
   if (!r || r.status !== "HOSPEDADA") return { ok: false, error: "Só hóspedes na casa podem ter veículo na garagem." };
   const inUse = await db.vehicle.findFirst({ where: { plate: parsed.data.plate, exitedAt: null }, select: { id: true } });
   if (inUse) return { ok: false, error: "Revise os campos destacados.", fieldErrors: { plate: ["Este veículo já está na garagem."] } };
+  const full = await parkingFull(db);
+  if (full) return { ok: false, error: full };
   await db.vehicle.create({ data: { ...parsed.data, reservationId } });
   await event(db, reservationId, actor.id, "veiculo", `Entrou ${parsed.data.plate}`);
   return { ok: true };

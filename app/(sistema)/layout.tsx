@@ -4,14 +4,16 @@ import { getHotelSettings } from "@/lib/settings";
 import { can, ROLE_LABEL } from "@/lib/permissions";
 import { logoutAction } from "@/app/entrar/actions";
 import { Sidebar, type NavItem } from "./sidebar";
+import { openRequestCount } from "@/lib/requests/service";
 
 import { getT } from "@/lib/i18n/server";
 import type { TFunction } from "@/lib/i18n/translate";
 // Módulos do sistema. Os que ainda não existem aparecem apagados com a
 // fase em que chegam: o funcionário já vê o "mapa" do sistema inteiro.
-function navFor(role: Parameters<typeof can>[0], tr: TFunction): NavItem[] {
+function navFor(role: Parameters<typeof can>[0], tr: TFunction, requests: number): NavItem[] {
   return [
     { href: "/mapa", label: tr("Mapa de quartos"), icon: "▦" },
+    ...(can(role, "requests.handle") ? [{ href: "/pedidos", label: tr("Pedidos dos hóspedes"), icon: "🔔", badge: requests }] : []),
     ...(can(role, "reservations.view")
       ? [
           { href: "/recepcao", label: tr("Recepção"), icon: "🛎" },
@@ -25,6 +27,7 @@ function navFor(role: Parameters<typeof can>[0], tr: TFunction): NavItem[] {
     ...(can(role, "restaurant.use") ? [{ href: "/restaurante", label: tr("Restaurante"), icon: "🍽" }] : []),
     ...(can(role, "kitchen.view") ? [{ href: "/cozinha", label: tr("Cozinha"), icon: "👨‍🍳" }] : []),
     ...(can(role, "minibar.post") ? [{ href: "/frigobar", label: tr("Frigobar"), icon: "🧃" }] : []),
+    ...(can(role, "revenue.manage") ? [{ href: "/revenue", label: tr("Revenue (preços)"), icon: "📈" }] : []),
     ...(can(role, "audit.run") ? [{ href: "/auditoria", label: tr("Auditoria noturna"), icon: "🌙" }] : []),
     { href: "/relatorios", label: tr("Relatórios"), icon: "📊" },
     ...(can(role, "settings.manage") ? [{ href: "/configuracoes", label: tr("Configurações"), icon: "⚙️", group: "Administração" }] : []),
@@ -38,13 +41,14 @@ function navFor(role: Parameters<typeof can>[0], tr: TFunction): NavItem[] {
 export default async function SistemaLayout({ children }: { children: React.ReactNode }) {
   const { user } = await verifySession();
   const tr = await getT();
-  const { hotelName } = await getHotelSettings(getDb());
+  const db = getDb();
+  const [{ hotelName }, requests] = await Promise.all([getHotelSettings(db), can(user.role, "requests.handle") ? openRequestCount(db) : 0]);
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar
         hotelName={hotelName}
-        items={navFor(user.role, tr)}
+        items={navFor(user.role, tr, requests)}
         userName={user.fullName}
         roleLabel={tr(ROLE_LABEL[user.role])}
         logout={logoutAction}

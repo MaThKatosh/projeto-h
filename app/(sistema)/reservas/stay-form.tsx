@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { suggestForStayAction } from "../revenue/actions";
 import { useRouter } from "next/navigation";
 import { FieldError, FormMessage } from "@/components/field-error";
 import type { FieldErrors } from "@/lib/auth/validation";
@@ -10,7 +11,7 @@ import type { Availability } from "@/lib/reservations/service";
 import { addDays, formatDate, nightsBetween, type DateStr } from "@/lib/dates";
 import { centsToInput, formatBRL, parseBRL } from "@/lib/money";
 import { computeTotals, SOURCE_LABEL, SOURCES, type Source } from "@/lib/reservations/rules";
-import { GuestFields, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "./guest-fields";
+import { CompanionsFields, GuestFields, readCompanions, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "./guest-fields";
 import {
   availabilityAction,
   createReservationAction,
@@ -83,6 +84,8 @@ export function StayForm({
   const [showOtherTypes, setShowOtherTypes] = useState(false);
 
   const [avail, setAvail] = useState<Availability[] | null>(null);
+  // Preço sugerido pelo revenue management (média das noites).
+  const [suggested, setSuggested] = useState<{ dailyCents: number; applied: string[] } | null>(null);
   const [rooms, setRooms] = useState<RoomOption[] | null>(null);
 
   // Hóspede (só na nova reserva)
@@ -103,6 +106,15 @@ export function StayForm({
       alive = false;
     };
   }, [checkIn, checkOut, validDates, mode, reservationId]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!validDates || !roomTypeId) return;
+    suggestForStayAction(roomTypeId, checkIn, checkOut).then((x) => alive && setSuggested(x));
+    return () => {
+      alive = false;
+    };
+  }, [roomTypeId, checkIn, checkOut, validDates]);
 
   function applyPlan(planId: string, typeId: string) {
     const plan = plans.find((p) => p.id === planId);
@@ -157,7 +169,7 @@ export function StayForm({
           return;
         }
       } else if (mode === "direto") {
-        result = await walkInAction({ stay, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form) });
+        result = await walkInAction({ stay, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form), companions: readCompanions(form) });
       } else {
         result = await createReservationAction(guest ? { guestId: guest.id, stay } : { guest: readGuest(form), stay });
       }
@@ -345,6 +357,12 @@ export function StayForm({
             <span className="text-xs text-zinc-500">{tr("Diária (R$)")}</span>
             <input className="field" inputMode="decimal" value={daily} onChange={(e) => setDaily(e.target.value)} placeholder="0,00" required />
             <FieldError messages={fe?.daily} />
+            {suggested && roomTypeId && validDates && centsToInput(suggested.dailyCents) !== daily && (
+              <span className="mt-1 block text-xs text-emerald-700" title={suggested.applied.join(", ")}>
+                {tr("📈 Sugerido: {0}", [formatBRL(suggested.dailyCents)])}{" "}
+                <button type="button" className="underline" onClick={() => setDaily(centsToInput(suggested.dailyCents))}>{tr("usar")}</button>
+              </span>
+            )}
           </label>
           <label className="flex items-center gap-2 pt-5 text-sm">
             <input type="checkbox" checked={breakfast} onChange={(e) => setBreakfast(e.target.checked)} />{" "}{tr("Café da manhã")}</label>
@@ -384,6 +402,11 @@ export function StayForm({
 
       {mode === "direto" && (
         <>
+          <section className="card space-y-3 p-5">
+            <h2 className="font-semibold">{tr("Acompanhantes ({0})", [Math.max(0, adults + children - 1)])}</h2>
+            <p className="text-xs text-zinc-500">{tr("O check-in só é feito com a ficha de todos completa (documento, nascimento, nacionalidade, sexo e residência).")}</p>
+            <CompanionsFields people={adults + children} />
+          </section>
           <section className="card space-y-3 p-5">
             <h2 className="font-semibold">{tr("4. Viagem (ficha FNRH)")}</h2>
             <TripFields />

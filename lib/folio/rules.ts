@@ -40,7 +40,8 @@ export const METHOD: Record<Method, { label: string; icon: string; color: string
 // Saldo
 // ----------------------------------------------------------------
 
-export type EntryLike = { kind: "COBRANCA" | "PAGAMENTO"; amountCents: number };
+// PENDENTE = parte da conta enviada para uma conta pendente (abate o saldo, não é recebimento).
+export type EntryLike = { kind: "COBRANCA" | "PAGAMENTO" | "PENDENTE"; amountCents: number };
 
 export function folioTotals(entries: EntryLike[]) {
   let charges = 0;

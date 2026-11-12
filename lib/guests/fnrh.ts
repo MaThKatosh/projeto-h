@@ -54,7 +54,8 @@ export const guestFnrhFields = {
   country: optional(40),
 };
 
-// O que falta na ficha para ela ficar completa (aviso, não bloqueia).
+// O que falta para a ficha ficar completa. O check-in só passa com a
+// ficha de todos os hóspedes completa.
 export function missingFnrh(g: {
   fullName: string;
   docNumber: string | null;
@@ -62,13 +63,17 @@ export function missingFnrh(g: {
   nationality: string | null;
   gender: string | null;
   city: string | null;
+  state?: string | null;
   country: string | null;
 }): string[] {
   const out: string[] = [];
+  if (!g.fullName || g.fullName.trim().split(/\s+/).length < 2) out.push("nome e sobrenome");
   if (!g.docNumber) out.push("documento");
   if (!g.birthDate) out.push("nascimento");
   if (!g.nationality) out.push("nacionalidade");
   if (!g.gender) out.push("sexo");
-  if (!g.city && !g.country) out.push("residência");
+  if (!g.country) out.push("país de residência");
+  if (!g.city) out.push("cidade");
+  if (g.country && /^brasil$/i.test(g.country) && !g.state) out.push("estado");
   return out;
 }

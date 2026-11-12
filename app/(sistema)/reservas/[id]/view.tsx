@@ -13,7 +13,7 @@ import { formatDate, nightsBetween, weekday, type DateStr } from "@/lib/dates";
 import { formatBRL, formatPercent } from "@/lib/money";
 import { SOURCE_LABEL, STATUS } from "@/lib/reservations/rules";
 import { effectiveCheckOut } from "@/lib/folio/rules";
-import { GuestFields, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "../guest-fields";
+import { CompanionsFields, GuestFields, readCompanions, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "../guest-fields";
 import { missingFnrh, PURPOSE_LABEL, TRANSPORT_LABEL } from "@/lib/guests/fnrh";
 import { StayForm } from "../stay-form";
 import type { FolioView } from "@/lib/folio/service";
@@ -35,6 +35,7 @@ import {
   readyRoomsAction,
   removeCompanionAction,
   updateGuestAndTripAction,
+  sendToPendingAction,
   vehicleExitAction,
   type ActionResult,
 } from "../actions";
@@ -59,6 +60,7 @@ const EVENT_LABEL: Record<string, string> = {
   desfeito: "Desfeito",
   reativada: "Reserva reativada",
   portal: "Portal",
+  pendente: "Conta pendente",
 };
 
 export function ReservationView({
@@ -73,6 +75,8 @@ export function ReservationView({
   paymentOptions,
   canUndo,
   initialAction,
+  pendingAccounts = [],
+  inPending = [],
 }: {
   r: ReservationDetail;
   today: DateStr;
@@ -85,6 +89,8 @@ export function ReservationView({
   paymentOptions: PaymentOptions;
   canUndo: boolean;
   initialAction: "checkin" | "checkout" | null;
+  pendingAccounts?: { id: string; number: number; remainingCents: number }[];
+  inPending?: string[];
 }) {
   const tr = useT();
   const router = useRouter();
@@ -136,6 +142,12 @@ export function ReservationView({
         )}
       </div>
 
+      {pendingAccounts.length > 0 && (
+        <Link href="/financeiro/pendentes" className="block rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 hover:bg-amber-100">
+          ⏳ {tr("Este hóspede tem conta pendente em aberto: {0}.", [pendingAccounts.map((p) => tr("nº {0} ({1})", [p.number, formatBRL(p.remainingCents)])).join(", ")])}
+        </Link>
+      )}
+
       {canUndo && (inHouse || r.status === "FINALIZADA" || r.status === "CANCELADA" || r.status === "NO_SHOW") && (
         <UndoBar
           label={inHouse ? tr("↶ Desfazer check-in") : r.status === "FINALIZADA" ? tr("↶ Desfazer check-out") : tr("↶ Reativar reserva")}
@@ -154,7 +166,7 @@ export function ReservationView({
       )}
 
       {panel === "checkin" && <CheckInPanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
-      {panel === "checkout" && <CheckOutPanel r={r} today={today} folio={folio} canPost={canPost} paymentOptions={paymentOptions} onClose={() => setPanel(null)} onDone={done} onStep={() => router.refresh()} />}
+      {panel === "checkout" && <CheckOutPanel r={r} today={today} folio={folio} canPost={canPost} paymentOptions={paymentOptions} inPending={inPending} onClose={() => setPanel(null)} onDone={done} onStep={() => router.refresh()} />}
       {panel === "trocar" && <MovePanel r={r} today={today} onClose={() => setPanel(null)} onDone={done} />}
       {panel === "quarto" && <AssignPanel r={r} onClose={() => setPanel(null)} onDone={done} />}
       {(panel === "cancelar" || panel === "noshow") && <CancelPanel r={r} noShow={panel === "noshow"} onClose={() => setPanel(null)} onDone={done} />}
@@ -382,7 +394,7 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
           e.preventDefault();
           const form = formRef.current!;
           run(
-            () => checkInAction(r.id, { roomId: effectiveRoom, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form) }),
+            () => checkInAction(r.id, { roomId: effectiveRoom, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form), companions: readCompanions(form) }),
             () => onDone("Check-in feito. Bem-vindo!")
           );
         }}
@@ -398,8 +410,13 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
           <RoomPicker rooms={rooms} value={effectiveRoom} onChange={setRoomId} typeId={r.roomTypeId} />
         </div>
         <div>
-          <h3 className="mb-2 text-sm font-semibold">{tr("2. Confira a ficha do hóspede")}</h3>
+          <h3 className="mb-2 text-sm font-semibold">{tr("2. Fichas dos hóspedes ({0} pessoa(s))", [r.adults + r.children])}</h3>
+          <p className="mb-2 text-xs text-zinc-500">{tr("O check-in só é feito com a ficha de todos completa (documento, nascimento, nacionalidade, sexo e residência).")}</p>
+          <div className="mb-1 text-sm font-semibold">{tr("Titular")}</div>
           <GuestFields initial={r.guest} errors={state.fieldErrors} requireDoc />
+          <div className="mt-4">
+            <CompanionsFields existing={r.companions} people={r.adults + r.children} />
+          </div>
         </div>
         <div>
           <h3 className="mb-2 text-sm font-semibold">{tr("3. Viagem (ficha FNRH)")}</h3>
@@ -429,7 +446,8 @@ function CheckOutPanel({
   onDone,
   onStep,
   paymentOptions,
-}: PanelProps & { today: DateStr; folio: FolioView; canPost: boolean; onStep: () => void; paymentOptions: PaymentOptions }) {
+  inPending,
+}: PanelProps & { today: DateStr; folio: FolioView; canPost: boolean; onStep: () => void; paymentOptions: PaymentOptions; inPending: string[] }) {
   const tr = useT();
   const { pending, state, run } = useAction();
   const [stepMsg, setStepMsg] = useState<string | null>(null);
@@ -470,7 +488,10 @@ function CheckOutPanel({
             {folio.balance < 0 && <p className="text-sm text-sky-800">{tr("O hóspede pagou a mais: use “Devolver crédito” na conta abaixo.")}</p>}
           </div>
           {folio.balance > 0 && nightsLeft === 0 && canPost && (
-            <PaymentForm reservationId={r.id} suggested={folio.balance} options={paymentOptions} onClose={() => undefined} onDone={step} />
+            <>
+              <PaymentForm reservationId={r.id} suggested={folio.balance} options={paymentOptions} onClose={() => undefined} onDone={step} />
+              <PendingForm r={r} folio={folio} inPending={inPending} onDone={step} />
+            </>
           )}
         </Step>
 
@@ -487,11 +508,86 @@ function CheckOutPanel({
           >
             {pending ? tr("Aguarde...") : tr("Confirmar check-out")}
           </button>
+          {!settled && (
+            <p className="mt-2 text-xs text-amber-700">
+              {nightsLeft > 0
+                ? tr("Para liberar: lance as diárias (passo 1).")
+                : folio.balance > 0
+                  ? tr("Para liberar: receba {0} ou deixe pendente (passo 2).", [formatBRL(folio.balance)])
+                  : tr("Para liberar: devolva o crédito de {0} na conta abaixo.", [formatBRL(-folio.balance)])}
+            </p>
+          )}
         </Step>
       </ol>
       {stepMsg && !state.error && <p className="mt-3 text-sm text-emerald-700">✓ {tr(stepMsg)}</p>}
       <FormMessage error={state.error} />
     </Box>
+  );
+}
+
+// Hóspede vai embora sem pagar uma parte (ex.: frigobar): as cobranças
+// marcadas viram uma conta pendente e o check-out fica liberado.
+function PendingForm({ r, folio, inPending, onDone }: { r: ReservationDetail; folio: FolioView; inPending: string[]; onDone: (msg: string) => void }) {
+  const tr = useT();
+  const [open, setOpen] = useState(false);
+  const charges = folio.entries.filter((e) => e.kind === "COBRANCA" && !e.reversedAt && !e.reversalOfId && e.amountCents > 0 && !inPending.includes(e.id));
+  const [picked, setPicked] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const { pending, state, run } = useAction();
+  const selected = charges.filter((c) => picked.includes(c.id)).reduce((s, c) => s + c.amountCents, 0);
+  const amount = Math.min(selected, folio.balance);
+
+  if (!open) {
+    return (
+      <button type="button" className="mt-2 text-sm text-amber-800 underline" onClick={() => setOpen(true)}>
+        {tr("O hóspede não vai pagar agora? Deixar pendente")}
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+      <div className="font-semibold text-amber-900">{tr("Deixar pendente")}</div>
+      <p className="text-xs text-amber-800">{tr("Marque o que fica para depois. O quarto é liberado e a cobrança vai para Financeiro → Contas pendentes.")}</p>
+      <ul className="space-y-1">
+        {charges.map((c) => (
+          <li key={c.id}>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={picked.includes(c.id)}
+                onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id)))}
+              />
+              <span className="flex-1">{c.description}</span>
+              <span className="tabular-nums">{formatBRL(c.amountCents)}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <label className="block">
+        <span className="text-xs text-zinc-600">{tr("Motivo")}</span>
+        <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr("Ex.: vai pagar o frigobar por Pix amanhã")} maxLength={300} />
+      </label>
+      {selected > folio.balance && (
+        <p className="text-xs text-amber-800">{tr("Parte já foi paga: fica pendente só o que falta ({0}).", [formatBRL(folio.balance)])}</p>
+      )}
+      <FormMessage error={state.fieldErrors ? Object.values(state.fieldErrors).flat()[0] : state.error} />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="btn bg-amber-600 text-white hover:bg-amber-700"
+          disabled={pending || amount <= 0}
+          onClick={() => run(() => sendToPendingAction(r.id, { entryIds: picked, reason }), () => {
+            setOpen(false);
+            setPicked([]);
+            setReason("");
+            onDone("Conta pendente criada. Agora dá para confirmar o check-out.");
+          })}
+        >
+          {tr("Deixar {0} pendente", [formatBRL(amount)])}
+        </button>
+        <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>{tr("Cancelar")}</button>
+      </div>
+    </div>
   );
 }
 
@@ -627,7 +723,7 @@ function CompanionAdd({ r, onClose, onDone }: PanelProps) {
         run(() => addCompanionAction(r.id, readGuest(formRef.current!, "c_")), () => onDone("Acompanhante incluído."));
       }}
     >
-      <GuestFields prefix="c_" errors={state.fieldErrors} compact />
+      <GuestFields prefix="c_" errors={state.fieldErrors} copyValues={r.guest} />
       <FormMessage error={state.fieldErrors ? undefined : state.error} />
       <div className="flex gap-2">
         <button className="btn-primary" disabled={pending}>{tr("Incluir")}</button>

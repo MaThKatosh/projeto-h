@@ -67,6 +67,10 @@ app/(sistema)       telas internas (menu lateral)
   usuarios/         usuários e cargos
   perfil/           trocar a própria senha e o idioma
   configuracoes/    dados do hotel, pagamentos, bandeiras, channel manager
+  financeiro/pendentes contas pendentes (receber / dar baixa)
+  pedidos/          pedidos dos hóspedes (QR); quartos/qr = cartões para imprimir
+  revenue/          revenue management: indicadores, calendário e regras de preço
+app/hospede/[token] página do hóspede aberta pelo QR do quarto (sem login)
   reservas/importar importar reservas dos portais (CSV)
   reservas/[id]/fnrh ficha FNRH para imprimir
 app/api/eventos     canal de avisos em tempo real
@@ -74,7 +78,10 @@ app/api/integracoes API do channel manager (reservas e vagas)
 app/api/saude       verificação de saúde (instalação)
 app/manifest.ts     app instalável (com public/sw.js e public/offline.html)
 lib/integrations/   leitura dos arquivos dos portais e gravação das reservas de fora
-lib/guests/fnrh.ts  campos e listas da FNRH
+lib/guests/fnrh.ts  campos e listas da FNRH (validate.ts: CPF, data, CEP; countries.json)
+lib/pending/        contas pendentes
+lib/requests/       pedidos dos hóspedes
+lib/revenue/        regras e cálculo do preço sugerido, indicadores
 lib/i18n/           idiomas (PT/EN/ES): tr("texto"), tabelas em messages/
 deploy/             instalação: Docker, Caddy (HTTPS), backup, instaladores
 apps/               apps nativos: conectar/ (tela inicial), desktop/ (Tauri), mobile/ (Capacitor)
@@ -105,3 +112,4 @@ docs/               uma página por fase
 - [x] **Fase 6** — auditoria noturna (lança diárias, guarda os números do dia, vira a data) e 17 relatórios com impressão e Excel ([docs/FASE-6.md](docs/FASE-6.md))
 - [x] **Extra** — tela de Configurações, bandeiras de cartão, botões de desfazer (auditoria, check-in, check-out, cancelamento) e idiomas PT/EN/ES ([docs/CONFIGURACOES.md](docs/CONFIGURACOES.md))
 - [x] **Fase 7** — instalação com HTTPS (PC do hotel ou nuvem) e backup diário, app instalável + apps nativos, importação de reservas dos portais e API para channel manager, ficha FNRH ([docs/FASE-7.md](docs/FASE-7.md))
+- [x] **Fase 8** — contas pendentes, ficha validada (CPF, datas, CEP, países) e check-in só com fichas completas, recepção em abas, vagas da garagem, pedidos do hóspede por QR code, borderô por usuário e setor, revenue management ([docs/FASE-8.md](docs/FASE-8.md))

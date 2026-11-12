@@ -12,11 +12,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const { slug } = await params;
   const url = new URL(request.url);
   const db = getDb();
-  const data = await runReport(db, session.user.role, slug, {
-    de: url.searchParams.get("de") ?? undefined,
-    ate: url.searchParams.get("ate") ?? undefined,
-    filtro: url.searchParams.get("filtro") ?? undefined,
-  });
+  const data = await runReport(db, session.user.role, slug, Object.fromEntries(url.searchParams.entries()));
   if (!data) return new Response("Relatório não encontrado.", { status: 404 });
 
   await audit(db, "report.download", { userId: session.user.id, metadata: { slug, from: data.from, to: data.to } });

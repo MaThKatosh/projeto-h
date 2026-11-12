@@ -133,7 +133,7 @@ export function Folio({
                     )}
                   </td>
                   <td className="py-2 pr-2 text-right align-top whitespace-nowrap">{e.kind === "COBRANCA" ? formatBRL(e.amountCents) : ""}</td>
-                  <td className="py-2 pr-2 text-right align-top whitespace-nowrap">{e.kind === "PAGAMENTO" ? formatBRL(e.amountCents) : ""}</td>
+                  <td className="py-2 pr-2 text-right align-top whitespace-nowrap">{e.kind === "PAGAMENTO" ? formatBRL(e.amountCents) : e.kind === "PENDENTE" ? <span className="text-amber-700" title={tr("Enviado para conta pendente")}>{formatBRL(e.amountCents)} ⏳</span> : ""}</td>
                   <td className="py-2 text-right align-top">
                     {canReverse && open && !reversed && !isReversal && (
                       <button className="text-xs text-red-700 underline" onClick={() => setReversing(e)}>{tr("estornar")}</button>

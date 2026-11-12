@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/auth/dal";
 import { listRatePlans } from "@/lib/rates/service";
 import { RatePlanForm } from "./rate-form";
 import { ParkingForm } from "./parking-form";
-import { getParkingDailyCents } from "@/lib/settings";
+import { getParkingDailyCents, getParkingSpots } from "@/lib/settings";
 
 import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
@@ -12,10 +12,11 @@ export default async function TarifasPage() {
   const tr = await getT();
   await requirePermission("rates.manage");
   const db = getDb();
-  const [plans, types, parking] = await Promise.all([
+  const [plans, types, parking, spots] = await Promise.all([
     listRatePlans(db),
     db.roomType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, capacity: true } }),
     getParkingDailyCents(db),
+    getParkingSpots(db),
   ]);
 
   return (
@@ -28,7 +29,7 @@ export default async function TarifasPage() {
         <RatePlanForm key={p.id} plan={p} types={types} />
       ))}
       <RatePlanForm types={types} />
-      <ParkingForm cents={parking} />
+      <ParkingForm cents={parking} spots={spots} />
     </div>
   );
 }

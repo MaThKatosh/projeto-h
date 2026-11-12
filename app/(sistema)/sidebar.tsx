@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useLiveRefresh } from "@/components/live-refresh";
 
 import { useT } from "@/components/i18n";
 export type NavItem = {
@@ -11,6 +12,7 @@ export type NavItem = {
   href?: string;
   soon?: string;
   group?: string;
+  badge?: number;
 };
 
 export function Sidebar({
@@ -29,6 +31,8 @@ export function Sidebar({
   const tr = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Contador de pedidos dos hóspedes no menu, sempre em dia.
+  useLiveRefresh(items.some((i) => i.href === "/pedidos") ? ["requests.changed"] : []);
   const operation = items.filter((i) => !i.group);
   const admin = items.filter((i) => i.group);
 
@@ -111,7 +115,8 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
       }`}
     >
       <span className="w-5 text-center">{item.icon}</span>
-      {tr(item.label)}
+      <span className="flex-1">{tr(item.label)}</span>
+      {item.badge ? <span className="rounded-full bg-red-600 px-2 text-xs font-bold text-white">{item.badge}</span> : null}
     </Link>
   );
 }

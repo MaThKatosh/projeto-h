@@ -113,12 +113,13 @@ export async function runAudit(db: Db, actor: SessionUser): Promise<({ ok: true;
   }
 
   // 2. Números do dia
-  const [roomsAvailable, charges, lodging, payments, pos] = await Promise.all([
+  const [roomsAvailable, charges, lodging, payments, pos, pend] = await Promise.all([
     db.room.count({ where: { active: true, maintenance: { notIn: ["BLOQUEADO", "EM_MANUTENCAO"] } } }),
     db.folioEntry.aggregate({ where: { businessDate: day, kind: "COBRANCA" }, _sum: { amountCents: true } }),
     db.folioEntry.aggregate({ where: { businessDate: day, kind: "COBRANCA", category: "DIARIA" }, _sum: { amountCents: true } }),
     db.folioEntry.aggregate({ where: { businessDate: day, kind: "PAGAMENTO" }, _sum: { amountCents: true } }),
     db.posPayment.aggregate({ where: { businessDate: day }, _sum: { amountCents: true } }),
+    db.pendingPayment.aggregate({ where: { businessDate: day }, _sum: { amountCents: true } }),
   ]);
   const guests = inHouse.reduce((s, r) => s + r.adults + r.children, 0);
 
@@ -133,7 +134,7 @@ export async function runAudit(db: Db, actor: SessionUser): Promise<({ ok: true;
       guests,
       lodgingCents: lodging._sum.amountCents ?? 0,
       revenueCents: charges._sum.amountCents ?? 0,
-      receivedCents: (payments._sum.amountCents ?? 0) + (pos._sum.amountCents ?? 0),
+      receivedCents: (payments._sum.amountCents ?? 0) + (pos._sum.amountCents ?? 0) + (pend._sum.amountCents ?? 0),
       summary: { openComandas: check.openComandas.length },
     },
   });

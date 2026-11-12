@@ -1,5 +1,5 @@
 import { Prisma } from "@/app/generated/prisma/client";
-import { INTEGRATION_USERNAME } from "@/lib/integrations/service";
+import { SYSTEM_USERNAMES } from "@/lib/system-users";
 import { audit } from "@/lib/audit";
 import type { Db } from "@/lib/db-types";
 import { hashPassword } from "@/lib/auth/password";
@@ -69,7 +69,7 @@ export async function updateUser(
   const target = await db.user.findUnique({ where: { id: targetId }, select: { id: true, role: true, username: true } });
   if (!target) return { ok: false, error: "Usuário não encontrado." };
   // Usuário técnico da integração (channel manager): ninguém entra com ele.
-  if (target.username === INTEGRATION_USERNAME) return { ok: false, error: "Este usuário é da integração e não pode ser alterado." };
+  if (SYSTEM_USERNAMES.includes(target.username)) return { ok: false, error: "Este usuário é da integração e não pode ser alterado." };
 
   const self = target.id === actor.id;
   const { fullName, role, active, password } = parsed.data;

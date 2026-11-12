@@ -7,6 +7,7 @@ import { listRatePlans } from "@/lib/rates/service";
 import { getReservation } from "@/lib/reservations/service";
 import { getFolio } from "@/lib/folio/service";
 import { getHotelSettings, listCardBrands } from "@/lib/settings";
+import { openPendingForGuest, pendingEntryIds } from "@/lib/pending/service";
 import { ReservationView } from "./view";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function ReservaPage({ params, searchParams }: { params: Pr
     listCardBrands(db, true),
   ]);
   if (!reservation || !folio) notFound();
+  const [pendingAccounts, inPending] = await Promise.all([openPendingForGuest(db, reservation.guest.id), pendingEntryIds(db, id)]);
 
   return (
     <ReservationView
@@ -42,6 +44,8 @@ export default async function ReservaPage({ params, searchParams }: { params: Pr
       canReverse={can(user.role, "finance.reverse")}
       paymentOptions={{ methods: settings.enabledMethods, brands: brands.map((b) => b.name) }}
       initialAction={acao === "checkin" || acao === "checkout" ? acao : null}
+      pendingAccounts={pendingAccounts}
+      inPending={inPending}
     />
   );
 }

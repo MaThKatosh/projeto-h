@@ -6,6 +6,7 @@ import { addDays, formatDate, isDateStr } from "@/lib/dates";
 import { formatBRL } from "@/lib/money";
 import { dailyReport, openAccounts } from "@/lib/folio/service";
 import { posPaymentsByDay } from "@/lib/restaurant/service";
+import { pendingPaymentsByDay } from "@/lib/pending/service";
 import { CATEGORY_LABEL, METHOD, METHODS, type Category } from "@/lib/folio/rules";
 import { LiveRefresher } from "@/components/live-refresher";
 import { clock } from "@/components/time";
@@ -20,10 +21,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const today = await getBusinessDate(db);
   const { data } = await searchParams;
   const date = isDateStr(data) && data <= today ? data : today;
-  const [report, accounts, pos] = await Promise.all([dailyReport(db, date), openAccounts(db), posPaymentsByDay(db, date)]);
+  const [report, accounts, pos, pend] = await Promise.all([dailyReport(db, date), openAccounts(db), posPaymentsByDay(db, date), pendingPaymentsByDay(db, date)]);
   // Borderô = contas dos quartos + o que o restaurante recebeu na hora.
-  const byMethod = Object.fromEntries(METHODS.map((m) => [m, report.byMethod[m] + pos.byMethod[m]])) as typeof report.byMethod;
-  const totalReceived = report.totalReceived + pos.total;
+  const byMethod = Object.fromEntries(METHODS.map((m) => [m, report.byMethod[m] + pos.byMethod[m] + pend.byMethod[m]])) as typeof report.byMethod;
+  const totalReceived = report.totalReceived + pos.total + pend.total;
   const reversals = report.entries.filter((e) => e.reversalOfId || e.isRefund);
   const owed = accounts.reduce((s, a) => s + Math.max(0, a.balance), 0);
 
@@ -41,6 +42,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             <button className="btn-secondary px-3 py-1.5">{tr("Ver")}</button>
           </form>
           {date < today && <Link className="btn-secondary px-3 py-1.5" href="/financeiro">{tr("Hoje")}</Link>}
+          <Link className="btn-secondary px-3 py-1.5" href="/financeiro/pendentes">{tr("⏳ Contas pendentes")}</Link>
         </div>
       </div>
 
@@ -53,12 +55,16 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
               <div className="text-xs">{tr(METHOD[m].icon)} {tr(METHOD[m].label)}</div>
               <div className="text-xl font-black">{formatBRL(byMethod[m])}</div>
               {pos.byMethod[m] > 0 && <div className="text-[11px]">{tr("restaurante:")}{" "}{formatBRL(pos.byMethod[m])}</div>}
+              {pend.byMethod[m] > 0 && <div className="text-[11px]">{tr("pendentes:")}{" "}{formatBRL(pend.byMethod[m])}</div>}
             </div>
           ))}
           <div className="rounded-xl bg-zinc-900 p-3 text-white">
             <div className="text-xs">{tr("Total recebido")}</div>
             <div className="text-xl font-black">{formatBRL(totalReceived)}</div>
-            {pos.total > 0 && <div className="text-[11px]">{tr("quartos {0} · restaurante", [formatBRL(report.totalReceived)])}{" "}{formatBRL(pos.total)}</div>}
+            {(pos.total > 0 || pend.total > 0) && (
+              <div className="text-[11px]">{tr("quartos {0} · restaurante {1} · pendentes {2}", [formatBRL(report.totalReceived), formatBRL(pos.total), formatBRL(pend.total)])}</div>
+            )}
+            <Link href="/relatorios/bordero" className="text-[11px] underline">{tr("por usuário e setor →")}</Link>
           </div>
         </div>
         <p className="mt-1 text-xs text-zinc-500">{tr("Estornos e devoluções já estão descontados.")}</p>

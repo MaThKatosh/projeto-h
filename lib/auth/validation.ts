@@ -56,6 +56,14 @@ export const changeOwnPasswordSchema = z
 
 export type FieldErrors = Record<string, string[] | undefined>;
 
+// Erros por campo, pelo nome do próprio campo (ex.: "guest.docNumber" → "docNumber"),
+// que é como os formulários procuram.
 export function fieldErrors(error: z.ZodError): FieldErrors {
-  return z.flattenError(error).fieldErrors as FieldErrors;
+  const out: FieldErrors = {};
+  for (const issue of error.issues) {
+    const key = [...issue.path].reverse().find((p) => typeof p === "string");
+    if (typeof key !== "string") continue;
+    (out[key] ??= []).push(issue.message);
+  }
+  return out;
 }

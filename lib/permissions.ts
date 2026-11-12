@@ -61,9 +61,13 @@ export type Permission =
   | "reports.view" // relatórios (cada relatório pode restringir mais)
   | "settings.manage" // configurações do hotel, bandeiras, formas de pagamento
   | "undo" // desfazer auditoria, check-in, check-out; reativar reserva
+  | "requests.handle" // atender pedidos dos hóspedes (QR do quarto)
+  | "revenue.manage" // revenue management: regras de preço
   | "users.manage";
 
 const PERMISSIONS: Record<Permission, readonly Role[]> = {
+  "requests.handle": ["ADMIN", "GERENTE", "RECEPCAO", "GOVERNANCA", "MANUTENCAO"],
+  "revenue.manage": ["ADMIN", "GERENTE"],
   "rooms.view": ROLES,
   "rooms.manage": ["ADMIN", "GERENTE"],
   "rooms.housekeeping": ["ADMIN", "GERENTE", "RECEPCAO", "GOVERNANCA"],

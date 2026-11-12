@@ -31,7 +31,7 @@ type Result<T = object> = ({ ok: true } & T) | Failure;
 
 export type FolioEntryView = {
   id: string;
-  kind: "COBRANCA" | "PAGAMENTO";
+  kind: "COBRANCA" | "PAGAMENTO" | "PENDENTE";
   category: Category | null;
   method: Method | null;
   description: string;
@@ -426,6 +426,7 @@ export async function reverseEntry(db: Db, actor: SessionUser, entryId: string, 
   if (!e) return { ok: false, error: "Lançamento não encontrado." };
   if (e.reversalOfId) return { ok: false, error: "Isto já é um estorno; não se estorna um estorno." };
   if (e.reversedAt) return { ok: false, error: "Este lançamento já foi estornado." };
+  if (e.kind === "PENDENTE") return { ok: false, error: "Este valor está numa conta pendente: receba ou dê baixa por lá (Financeiro → Contas pendentes)." };
   if (e.reservation.status === "FINALIZADA" || e.reservation.status === "CANCELADA" || e.reservation.status === "NO_SHOW") {
     return { ok: false, error: "Conta encerrada: não dá para estornar depois do check-out." };
   }
@@ -449,7 +450,7 @@ export async function checkoutBlocker(db: Db, reservationId: string): Promise<st
   if (folio.checkoutNights.length > 0) {
     return `Faltam lançar ${folio.checkoutNights.length} diária(s) (${formatBRL(folio.checkoutPreview)}). Use "Fechar a conta" antes do check-out.`;
   }
-  if (folio.balance > 0) return `A conta tem ${formatBRL(folio.balance)} a pagar. Receba o pagamento antes do check-out.`;
+  if (folio.balance > 0) return `A conta tem ${formatBRL(folio.balance)} a pagar. Receba o pagamento ou use "Deixar pendente" antes do check-out.`;
   if (folio.balance < 0) return `O hóspede tem ${formatBRL(-folio.balance)} de crédito. Faça a devolução antes do check-out.`;
   return null;
 }
