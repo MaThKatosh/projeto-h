@@ -51,6 +51,8 @@ app/(sistema)       telas internas (menu lateral)
   cozinha/          pedidos para preparar
   frigobar/         lançar consumo e lista de reposição
   cardapio/         itens, mesas e taxa de serviço
+  auditoria/        auditoria noturna
+  relatorios/       relatórios (tela, impressão e CSV)
   quartos/          cadastro de tipos e quartos
   usuarios/         usuários e cargos
   perfil/           trocar a própria senha
@@ -64,6 +66,8 @@ lib/rates/          tarifas
 lib/folio/          conta do quarto: lançamentos, diárias, estornos
 lib/restaurant/     comandas, cozinha, cardápio
 lib/minibar/        frigobar
+lib/night-audit/    auditoria noturna
+lib/reports/        motor e catálogo de relatórios
 lib/hotel-date.ts   data do sistema (data hoteleira)
 lib/realtime.ts     avisos em tempo real (PostgreSQL LISTEN/NOTIFY)
 docs/               uma página por fase
@@ -76,5 +80,5 @@ docs/               uma página por fase
 - [x] **Fase 3** — reservas, tarifas com ISS, recepção, check-in/out, troca de quarto, garagem ([docs/FASE-3.md](docs/FASE-3.md))
 - [x] **Fase 4** — conta do quarto, pagamentos, estornos, check-out com conta zerada, borderô ([docs/FASE-4.md](docs/FASE-4.md))
 - [x] **Fase 5** — restaurante (salão, comandas, cozinha), frigobar e cardápio, lançando na conta do quarto ([docs/FASE-5.md](docs/FASE-5.md))
-- [ ] Fase 6 — auditoria noturna e relatórios
+- [x] **Fase 6** — auditoria noturna (lança diárias, guarda os números do dia, vira a data) e 17 relatórios com impressão e Excel ([docs/FASE-6.md](docs/FASE-6.md))
 - [ ] Fase 7 — apps instalados (Windows, Mac, Linux, celular) e integração com portais

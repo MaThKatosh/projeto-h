@@ -49,7 +49,6 @@ export type Permission =
   | "reservations.view" // ver reservas, recepção e garagem
   | "reservations.manage" // criar/alterar reservas, check-in/out, troca de quarto
   | "rates.manage" // tarifas
-  | "businessDate.advance" // avançar a data do sistema (até a auditoria da Fase 6)
   | "finance.view" // ver contas e o financeiro (borderô)
   | "finance.post" // lançar cobranças e receber pagamentos
   | "finance.reverse" // estornar lançamentos
@@ -58,6 +57,8 @@ export type Permission =
   | "kitchen.view" // tela da cozinha
   | "menu.manage" // cardápio, mesas, taxa de serviço
   | "minibar.post" // lançar consumo do frigobar
+  | "audit.run" // rodar a auditoria noturna
+  | "reports.view" // relatórios (cada relatório pode restringir mais)
   | "users.manage";
 
 const PERMISSIONS: Record<Permission, readonly Role[]> = {
@@ -73,7 +74,6 @@ const PERMISSIONS: Record<Permission, readonly Role[]> = {
   "reservations.view": ["ADMIN", "GERENTE", "RECEPCAO"],
   "reservations.manage": ["ADMIN", "GERENTE", "RECEPCAO"],
   "rates.manage": ["ADMIN", "GERENTE"],
-  "businessDate.advance": ["ADMIN", "GERENTE"],
   "finance.view": ["ADMIN", "GERENTE", "RECEPCAO"],
   "finance.post": ["ADMIN", "GERENTE", "RECEPCAO"],
   "finance.reverse": ["ADMIN", "GERENTE"],
@@ -82,6 +82,9 @@ const PERMISSIONS: Record<Permission, readonly Role[]> = {
   "kitchen.view": ["ADMIN", "GERENTE", "RESTAURANTE"],
   "menu.manage": ["ADMIN", "GERENTE"],
   "minibar.post": ["ADMIN", "GERENTE", "RECEPCAO", "GOVERNANCA"],
+  // O recepcionista da noite costuma fazer a auditoria.
+  "audit.run": ["ADMIN", "GERENTE", "RECEPCAO"],
+  "reports.view": ["ADMIN", "GERENTE", "RECEPCAO"],
   "users.manage": ["ADMIN", "GERENTE"],
 };
 

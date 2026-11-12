@@ -58,6 +58,7 @@ model User {
   comandasClosed      Comanda[]          @relation("ComandaCloser")
   comandaItems        ComandaItem[]
   posPayments         PosPayment[]
+  auditRuns           AuditRun[]
 }
 
 model AuthSession {
@@ -674,4 +675,31 @@ model PosPayment {
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([businessDate])
+}
+
+// ================================================================
+// AUDITORIA NOTURNA (Fase 6)
+// ================================================================
+//
+// Fecha o dia do hotel: lança as diárias da noite, guarda os números do
+// dia (ocupação, receita) e vira a data do sistema. Uma por dia.
+
+model AuditRun {
+  id              String   @id @default(uuid()) @db.Uuid
+  businessDate    DateTime @unique @db.Date // dia que foi fechado
+  nextDate        DateTime @db.Date         // nova data do sistema
+  userId          String?  @db.Uuid
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  nightsPosted    Int      @default(0)
+  nightsCents     Int      @default(0)      // diárias + ISS + garagem lançados pela auditoria
+  roomsOccupied   Int      @default(0)
+  roomsAvailable  Int      @default(0)      // ativos e não bloqueados/em manutenção
+  guests          Int      @default(0)
+  lodgingCents    Int      @default(0)      // receita de diárias do dia (para diária média)
+  revenueCents    Int      @default(0)      // todas as cobranças do dia
+  receivedCents   Int      @default(0)      // todos os pagamentos do dia (quartos + restaurante)
+  summary         Json?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

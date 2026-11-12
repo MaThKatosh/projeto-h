@@ -37,3 +37,34 @@ body {
 @utility card {
   @apply rounded-xl border border-zinc-200 bg-white shadow-sm;
 }
+
+/* Impressão de relatórios: só o conteúdo, sem menu nem botões. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block;
+  }
+  main {
+    padding: 0 !important;
+  }
+  body {
+    background: white;
+  }
+  .card {
+    box-shadow: none;
+    border-color: #d4d4d8;
+  }
+  table {
+    font-size: 10px;
+  }
+  tr {
+    break-inside: avoid;
+  }
+}

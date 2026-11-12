@@ -7,7 +7,6 @@ import { formatDate, localToday, nightsBetween } from "@/lib/dates";
 import { frontDesk, type ReservationRow } from "@/lib/reservations/service";
 import { displayStatus, DISPLAY } from "@/lib/rooms/status";
 import { LiveRefresher } from "@/components/live-refresher";
-import { AdvanceDateButton } from "./advance-date";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +32,9 @@ export default async function RecepcaoPage() {
           <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-600">
             <LiveRefresher types={["reservations.changed", "room.updated", "rooms.changed"]} />
             <span>Data do sistema: <b>{formatDate(today, true)}</b></span>
-            {can(user.role, "businessDate.advance") && behind && <AdvanceDateButton />}
+            {can(user.role, "audit.run") && behind && (
+              <Link href="/auditoria" className="btn-secondary px-2 py-1 text-xs">🌙 Ir para a auditoria</Link>
+            )}
           </div>
         </div>
         {canManage && (
@@ -47,7 +48,7 @@ export default async function RecepcaoPage() {
       {behind && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           O calendário já está em {formatDate(localToday(), true)}, mas a data do sistema ainda é {formatDate(today, true)}.
-          Até a auditoria noturna (Fase 6), o gerente avança a data aqui na recepção.
+          A data só vira quando a auditoria noturna for rodada.
         </p>
       )}
 

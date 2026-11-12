@@ -69,7 +69,7 @@ export function Folio({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           <span>
             {folio.pendingNights.length} diária(s) vencida(s) ainda não lançada(s): {folio.pendingNights.map((n) => formatDate(n)).join(", ")}.
-            <span className="block text-xs">A partir da Fase 6 a auditoria noturna lança sozinha.</span>
+            <span className="block text-xs">Normalmente a auditoria noturna lança sozinha; estas ficaram para trás.</span>
           </span>
           {canPost && (
             <button className="btn-secondary" disabled={pending} onClick={postNights}>Lançar agora</button>

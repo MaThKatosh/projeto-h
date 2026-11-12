@@ -11,7 +11,6 @@ import type { Failure, SessionUser } from "@/lib/auth/service";
 import type { Db } from "@/lib/db-types";
 import type { RoomView } from "@/lib/rooms/service";
 import { searchGuests } from "@/lib/guests/service";
-import { advanceBusinessDate } from "@/lib/hotel-date";
 import * as svc from "@/lib/reservations/service";
 import * as folio from "@/lib/folio/service";
 
@@ -90,16 +89,6 @@ export async function addVehicleAction(reservationId: string, input: unknown) {
 
 export async function vehicleExitAction(vehicleId: string) {
   return run((db, u) => svc.vehicleExit(db, u, vehicleId));
-}
-
-export async function advanceDateAction(): Promise<ActionResult> {
-  const { user } = await verifySession();
-  if (!can(user.role, "businessDate.advance")) return { ok: false, error: "Seu cargo não pode mudar a data do sistema." };
-  const result = await advanceBusinessDate(getDb());
-  if (!result.ok) return result;
-  await publish({ type: "reservations.changed" });
-  revalidatePath("/", "layout");
-  return { ok: true };
 }
 
 // ----------------------------------------------------------------

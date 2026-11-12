@@ -189,6 +189,15 @@ export async function getFolio(db: Db, reservationId: string): Promise<FolioView
 // Lança diária (+ ISS + estacionamento) de cada noite que falta até
 // "until" (exclusive). Usado na recepção, no check-out e, na Fase 6,
 // pela auditoria noturna. actor null = sistema.
+// O que seria lançado até "until", sem gravar nada (prévia da auditoria).
+export async function previewNights(db: Db, reservationId: string, until: DateStr) {
+  const [stay, rows, parkingDaily] = await Promise.all([stayInfo(db, reservationId), loadEntries(db, reservationId), getParkingDailyCents(db)]);
+  if (!stay || stay.status !== "HOSPEDADA") return { nights: [] as DateStr[], total: 0 };
+  const nights = nightsToPost(toDateStr(stay.checkIn), until, postedNights(rows));
+  const total = nights.flatMap((n) => nightCharges(stay, n, parkingDaily)).reduce((s, c) => s + c.amountCents, 0);
+  return { nights, total };
+}
+
 export async function postNights(db: Db, actor: { id: string } | null, reservationId: string, until: DateStr) {
   const [stay, rows, today, parkingDaily] = await Promise.all([
     stayInfo(db, reservationId),
