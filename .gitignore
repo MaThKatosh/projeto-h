@@ -45,3 +45,4 @@ next-env.d.ts
 # exemplo de variáveis (versionado)
 !.env.example
 deploy/backups/
+/instaladores/

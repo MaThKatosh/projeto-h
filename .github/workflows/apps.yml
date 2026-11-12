@@ -11,8 +11,6 @@ on:
         description: "Montar também para Mac (no GitHub, minuto de Mac conta 10x)"
         type: boolean
         default: false
-  push:
-    tags: ["app-v*"]
 
 jobs:
   desktop:
@@ -49,7 +47,7 @@ jobs:
 
   mac:
     name: Computador (Mac)
-    if: github.event_name == 'push' || inputs.mac
+    if: inputs.mac
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
