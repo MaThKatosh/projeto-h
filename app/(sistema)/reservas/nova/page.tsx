@@ -5,9 +5,11 @@ import { addDays } from "@/lib/dates";
 import { listRatePlans } from "@/lib/rates/service";
 import { StayForm } from "../stay-form";
 
+import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
 
 export default async function NovaReservaPage({ searchParams }: { searchParams: Promise<{ direto?: string }> }) {
+  const tr = await getT();
   await requirePermission("reservations.manage");
   const db = getDb();
   const [today, plans, types, params] = await Promise.all([
@@ -21,11 +23,9 @@ export default async function NovaReservaPage({ searchParams }: { searchParams: 
   return (
     <div className="max-w-5xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">{walkIn ? "Entrada direta (sem reserva)" : "Nova reserva"}</h1>
+        <h1 className="text-2xl font-bold">{walkIn ? tr("Entrada direta (sem reserva)") : tr("Nova reserva")}</h1>
         <p className="text-sm text-zinc-500">
-          {walkIn
-            ? "O hóspede chegou sem reserva: cria a reserva e já faz o check-in num quarto limpo."
-            : "Preencha o hóspede e a estadia. O quarto pode ser escolhido agora ou depois."}
+          {walkIn ? tr("O hóspede chegou sem reserva: cria a reserva e já faz o check-in num quarto limpo.") : tr("Preencha o hóspede e a estadia. O quarto pode ser escolhido agora ou depois.")}
         </p>
       </div>
       <StayForm

@@ -4,6 +4,7 @@ import { FieldError } from "@/components/field-error";
 import type { FieldErrors } from "@/lib/auth/validation";
 import type { GuestView } from "@/lib/guests/service";
 
+import { useT } from "@/components/i18n";
 // Campos do hóspede (não controlados). Lidos com readGuest(form, prefixo).
 export function GuestFields({
   prefix = "g_",
@@ -18,54 +19,55 @@ export function GuestFields({
   requireDoc?: boolean;
   compact?: boolean;
 }) {
+  const tr = useT();
   const n = (k: string) => `${prefix}${k}`;
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <label className="sm:col-span-2">
-        <span className="text-xs text-zinc-500">Nome completo *</span>
+        <span className="text-xs text-zinc-500">{tr("Nome completo *")}</span>
         <input name={n("fullName")} className="field" defaultValue={initial?.fullName} required />
         <FieldError messages={errors?.fullName} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Documento{requireDoc ? " *" : ""}</span>
+        <span className="text-xs text-zinc-500">{tr("Documento")}{requireDoc ? " *" : ""}</span>
         <select name={n("docType")} className="field" defaultValue={initial?.docType ?? "CPF"}>
-          <option value="CPF">CPF</option>
-          <option value="RG">RG</option>
-          <option value="PASSAPORTE">Passaporte</option>
-          <option value="OUTRO">Outro</option>
+          <option value="CPF">{tr("CPF")}</option>
+          <option value="RG">{tr("RG")}</option>
+          <option value="PASSAPORTE">{tr("Passaporte")}</option>
+          <option value="OUTRO">{tr("Outro")}</option>
         </select>
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Número{requireDoc ? " *" : ""}</span>
+        <span className="text-xs text-zinc-500">{tr("Número")}{requireDoc ? " *" : ""}</span>
         <input name={n("docNumber")} className="field" defaultValue={initial?.docNumber ?? ""} required={requireDoc} />
         <FieldError messages={errors?.docNumber} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Telefone</span>
+        <span className="text-xs text-zinc-500">{tr("Telefone")}</span>
         <input name={n("phone")} className="field" inputMode="tel" defaultValue={initial?.phone ?? ""} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">E-mail</span>
+        <span className="text-xs text-zinc-500">{tr("E-mail")}</span>
         <input name={n("email")} type="email" className="field" defaultValue={initial?.email ?? ""} />
         <FieldError messages={errors?.email} />
       </label>
       {!compact && (
         <>
           <label>
-            <span className="text-xs text-zinc-500">Nascimento</span>
+            <span className="text-xs text-zinc-500">{tr("Nascimento")}</span>
             <input name={n("birthDate")} type="date" className="field" defaultValue={initial?.birthDate ?? ""} />
             <FieldError messages={errors?.birthDate} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Nacionalidade</span>
+            <span className="text-xs text-zinc-500">{tr("Nacionalidade")}</span>
             <input name={n("nationality")} className="field" defaultValue={initial?.nationality ?? "Brasileira"} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Cidade</span>
+            <span className="text-xs text-zinc-500">{tr("Cidade")}</span>
             <input name={n("city")} className="field" defaultValue={initial?.city ?? ""} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Estado</span>
+            <span className="text-xs text-zinc-500">{tr("Estado")}</span>
             <input name={n("state")} className="field" defaultValue={initial?.state ?? ""} maxLength={30} />
           </label>
         </>
@@ -91,24 +93,25 @@ export function readGuest(form: HTMLFormElement, prefix = "g_") {
 }
 
 export function VehicleFields({ prefix = "v_", errors }: { prefix?: string; errors?: FieldErrors }) {
+  const tr = useT();
   return (
     <div className="grid gap-3 sm:grid-cols-4">
       <label>
-        <span className="text-xs text-zinc-500">Placa</span>
-        <input name={`${prefix}plate`} className="field uppercase" placeholder="ABC1D23" />
+        <span className="text-xs text-zinc-500">{tr("Placa")}</span>
+        <input name={`${prefix}plate`} className="field uppercase" placeholder={tr("ABC1D23")} />
         <FieldError messages={errors?.plate} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Modelo</span>
-        <input name={`${prefix}model`} className="field" placeholder="Ex.: Onix" />
+        <span className="text-xs text-zinc-500">{tr("Modelo")}</span>
+        <input name={`${prefix}model`} className="field" placeholder={tr("Ex.: Onix")} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Cor</span>
+        <span className="text-xs text-zinc-500">{tr("Cor")}</span>
         <input name={`${prefix}color`} className="field" />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Vaga</span>
-        <input name={`${prefix}spot`} className="field" placeholder="Ex.: 12" />
+        <span className="text-xs text-zinc-500">{tr("Vaga")}</span>
+        <input name={`${prefix}spot`} className="field" placeholder={tr("Ex.: 12")} />
       </label>
     </div>
   );

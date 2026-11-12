@@ -5,9 +5,11 @@ import { RatePlanForm } from "./rate-form";
 import { ParkingForm } from "./parking-form";
 import { getParkingDailyCents } from "@/lib/settings";
 
+import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
 
 export default async function TarifasPage() {
+  const tr = await getT();
   await requirePermission("rates.manage");
   const db = getDb();
   const [plans, types, parking] = await Promise.all([
@@ -19,11 +21,8 @@ export default async function TarifasPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Tarifas</h1>
-        <p className="text-sm text-zinc-500">
-          Cada tarifa tem o valor da diária por tipo de quarto. Na reserva o valor é copiado e pode ser ajustado; mudar a
-          tarifa aqui não altera reservas já feitas.
-        </p>
+        <h1 className="text-2xl font-bold">{tr("Tarifas")}</h1>
+        <p className="text-sm text-zinc-500">{tr("Cada tarifa tem o valor da diária por tipo de quarto. Na reserva o valor é copiado e pode ser ajustado; mudar a tarifa aqui não altera reservas já feitas.")}</p>
       </div>
       {plans.map((p) => (
         <RatePlanForm key={p.id} plan={p} types={types} />

@@ -74,7 +74,7 @@ export function totals(result: ReportResult): Record<string, number> | null {
 
 // Arquivo CSV no padrão do Excel brasileiro: separador ";", vírgula
 // decimal e BOM para os acentos abrirem certo.
-export function toCsv(result: ReportResult): string {
+export function toCsv(result: ReportResult, tr: (s: string) => string = (s) => s): string {
   const esc = (v: string) => (/[";\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const cell = (v: CellValue, type: Column["type"]) => {
     if (v === null || v === undefined) return "";
@@ -84,10 +84,10 @@ export function toCsv(result: ReportResult): string {
     if (type === "datetime") return formatCell(v, "datetime");
     return String(v);
   };
-  const lines = [result.columns.map((c) => esc(c.label)).join(";")];
+  const lines = [result.columns.map((c) => esc(tr(c.label))).join(";")];
   for (const r of result.rows) lines.push(result.columns.map((c) => esc(cell(r[c.key], c.type))).join(";"));
   const t = totals(result);
-  if (t) lines.push(result.columns.map((c, i) => (i === 0 ? "TOTAL" : c.key in t ? esc(cell(t[c.key], c.type)) : "")).join(";"));
+  if (t) lines.push(result.columns.map((c, i) => (i === 0 ? tr("TOTAL") : c.key in t ? esc(cell(t[c.key], c.type)) : "")).join(";"));
   return "﻿" + lines.join("\r\n");
 }
 

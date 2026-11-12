@@ -2,6 +2,7 @@
 
 import { METHOD, type Method } from "@/lib/folio/rules";
 
+import { useT } from "@/components/i18n";
 export type PaymentOptions = { methods: Method[]; brands: string[] };
 
 // Escolha da forma de pagamento (só as ativas nas configurações) e, no
@@ -21,6 +22,7 @@ export function PaymentPicker({
   onBrand: (b: string) => void;
   small?: boolean;
 }) {
+  const tr = useT();
   const isCard = method === "CREDITO" || method === "DEBITO";
   return (
     <div className="space-y-2">
@@ -35,13 +37,13 @@ export function PaymentPicker({
               method === m ? "border-blue-600 bg-blue-50" : "border-zinc-200 bg-white hover:border-zinc-400"
             }`}
           >
-            {METHOD[m].icon} {METHOD[m].label}
+            {tr(METHOD[m].icon)} {tr(METHOD[m].label)}
           </button>
         ))}
       </div>
       {isCard && options.brands.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-zinc-500">Bandeira:</span>
+          <span className="text-xs text-zinc-500">{tr("Bandeira:")}</span>
           {options.brands.map((b) => (
             <button
               key={b}

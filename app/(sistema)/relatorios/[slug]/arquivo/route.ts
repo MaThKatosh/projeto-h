@@ -3,6 +3,7 @@ import { getCurrentSession } from "@/lib/auth/dal";
 import { audit } from "@/lib/audit";
 import { toCsv } from "@/lib/reports/engine";
 import { runReport } from "@/lib/reports/run";
+import { getT } from "@/lib/i18n/server";
 
 // Download do relatório em CSV (abre direto no Excel).
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -20,7 +21,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   await audit(db, "report.download", { userId: session.user.id, metadata: { slug, from: data.from, to: data.to } });
   const name = data.def.period === "none" ? `${slug}.csv` : `${slug}_${data.from}_a_${data.to}.csv`;
-  return new Response(toCsv(data.result), {
+  const tr = await getT();
+  return new Response(toCsv(data.result, (s) => tr(s)), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${name}"`,

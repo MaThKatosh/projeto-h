@@ -7,11 +7,13 @@ import { clock } from "@/components/time";
 import { formatBRL } from "@/lib/money";
 import { minibarAction } from "../restaurante/actions";
 
+import { useT } from "@/components/i18n";
 type Guest = { reservationId: string; number: number; name: string; room: string };
 type Item = { id: string; name: string; group: string; priceCents: number };
 type Consumed = { id: string; item: string; quantity: number; amountCents: number; room: string; by: string; createdAt: string };
 
 export function MinibarScreen({ guests, menu, today, initialReservation }: { guests: Guest[]; menu: Item[]; today: Consumed[]; initialReservation: string }) {
+  const tr = useT();
   const router = useRouter();
   const connected = useLiveRefresh(["reservations.changed", "restaurant.changed"]);
   const [reservation, setReservation] = useState(initialReservation);
@@ -32,17 +34,17 @@ export function MinibarScreen({ guests, menu, today, initialReservation }: { gue
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">🧃 Frigobar</h1>
+        <h1 className="text-2xl font-bold">{tr("🧃 Frigobar")}</h1>
         <LiveDot connected={connected} />
       </div>
 
       <section className="card space-y-4 p-4">
         <label className="block max-w-md">
-          <span className="text-xs text-zinc-500">Quarto conferido</span>
+          <span className="text-xs text-zinc-500">{tr("Quarto conferido")}</span>
           <select className="field text-lg" value={reservation} onChange={(e) => { setReservation(e.target.value); setMsg({}); }}>
-            <option value="">Escolha o quarto</option>
+            <option value="">{tr("Escolha o quarto")}</option>
             {guests.map((g) => (
-              <option key={g.reservationId} value={g.reservationId}>Quarto {g.room} — {g.name}</option>
+              <option key={g.reservationId} value={g.reservationId}>{tr("Quarto {0} —", [g.room])}{" "}{g.name}</option>
             ))}
           </select>
         </label>
@@ -55,17 +57,17 @@ export function MinibarScreen({ guests, menu, today, initialReservation }: { gue
                 <div className="text-sm font-semibold">{m.name}</div>
                 <div className="text-xs text-zinc-500">{formatBRL(m.priceCents)}</div>
                 <div className="mt-2 flex items-center justify-between">
-                  <button className="h-9 w-9 rounded-lg bg-zinc-100 text-xl font-bold" onClick={() => bump(m.id, -1)} aria-label={`Menos ${m.name}`}>−</button>
+                  <button className="h-9 w-9 rounded-lg bg-zinc-100 text-xl font-bold" onClick={() => bump(m.id, -1)} aria-label={tr("Menos {0}", [m.name])}>−</button>
                   <span className="text-xl font-black">{n}</span>
-                  <button className="h-9 w-9 rounded-lg bg-blue-600 text-xl font-bold text-white" onClick={() => bump(m.id, 1)} aria-label={`Mais ${m.name}`}>+</button>
+                  <button className="h-9 w-9 rounded-lg bg-blue-600 text-xl font-bold text-white" onClick={() => bump(m.id, 1)} aria-label={tr("Mais {0}", [m.name])}>+</button>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {msg.ok && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">✓ {msg.ok}</p>}
-        {msg.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{msg.error}</p>}
+        {msg.ok && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">✓ {tr(msg.ok)}</p>}
+        {msg.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{tr(msg.error)}</p>}
 
         <button
           className="btn-primary w-full py-4 text-base sm:w-auto sm:px-8"
@@ -81,16 +83,16 @@ export function MinibarScreen({ guests, menu, today, initialReservation }: { gue
             })
           }
         >
-          {lines.length ? `Lançar ${lines.reduce((s, m) => s + qty[m.id], 0)} item(ns) · ${formatBRL(total)}` : "Marque os itens consumidos"}
+          {lines.length ? tr("Lançar {0} item(ns) · {1}", [lines.reduce((s, m) => s + qty[m.id], 0), formatBRL(total)]) : tr("Marque os itens consumidos")}
         </button>
-        <p className="text-xs text-zinc-500">Lançou errado? O gerente estorna na conta do quarto (Reservas → reserva → Conta).</p>
+        <p className="text-xs text-zinc-500">{tr("Lançou errado? O gerente estorna na conta do quarto (Reservas → reserva → Conta).")}</p>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
-          <h2 className="mb-2 font-semibold">Para repor hoje</h2>
+          <h2 className="mb-2 font-semibold">{tr("Para repor hoje")}</h2>
           {restock.length === 0 ? (
-            <p className="text-sm text-zinc-400">Nada consumido hoje.</p>
+            <p className="text-sm text-zinc-400">{tr("Nada consumido hoje.")}</p>
           ) : (
             <ul className="space-y-1 text-sm">
               {restock.map(([item, n]) => (
@@ -100,15 +102,15 @@ export function MinibarScreen({ guests, menu, today, initialReservation }: { gue
           )}
         </section>
         <section className="card p-4">
-          <h2 className="mb-2 font-semibold">Lançamentos de hoje</h2>
+          <h2 className="mb-2 font-semibold">{tr("Lançamentos de hoje")}</h2>
           <ul className="space-y-1 text-sm">
             {today.map((c) => (
               <li key={c.id} className="flex justify-between gap-2">
-                <span><b>{c.room}</b> · {c.quantity}× {c.item} <span className="text-xs text-zinc-500">({c.by}, {clock(c.createdAt)})</span></span>
+                <span><b>{c.room}</b>{" "}{tr("· {0}× {1}", [c.quantity, c.item])}{" "}<span className="text-xs text-zinc-500">({c.by}, {clock(c.createdAt)})</span></span>
                 <span>{formatBRL(c.amountCents)}</span>
               </li>
             ))}
-            {today.length === 0 && <li className="text-zinc-400">Nenhum.</li>}
+            {today.length === 0 && <li className="text-zinc-400">{tr("Nenhum.")}</li>}
           </ul>
         </section>
       </div>

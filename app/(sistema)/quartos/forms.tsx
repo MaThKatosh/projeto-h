@@ -11,6 +11,7 @@ import {
   type FormState,
 } from "./actions";
 
+import { useT } from "@/components/i18n";
 type TypeOption = { id: string; name: string };
 
 export function RoomTypeForm({
@@ -20,6 +21,7 @@ export function RoomTypeForm({
   type?: { id: string; name: string; capacity: number; description: string };
   roomCount?: number;
 }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(
     type ? updateRoomTypeAction : createRoomTypeAction,
     undefined
@@ -32,22 +34,22 @@ export function RoomTypeForm({
     >
       {type && <input type="hidden" name="id" value={type.id} />}
       <label>
-        <span className="text-xs text-zinc-500">Nome {roomCount !== undefined && `(${roomCount} quartos)`}</span>
-        <input name="name" className="field" defaultValue={type?.name} placeholder="Novo tipo" required />
+        <span className="text-xs text-zinc-500">{tr("Nome")}{" "}{roomCount !== undefined && tr("({0} quartos)", [roomCount])}</span>
+        <input name="name" className="field" defaultValue={type?.name} placeholder={tr("Novo tipo")} required />
         <FieldError messages={state?.fieldErrors?.name} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Pessoas</span>
+        <span className="text-xs text-zinc-500">{tr("Pessoas")}</span>
         <input name="capacity" type="number" min={1} max={20} className="field" defaultValue={type?.capacity ?? 2} required />
         <FieldError messages={state?.fieldErrors?.capacity} />
       </label>
       <label>
-        <span className="text-xs text-zinc-500">Descrição (opcional)</span>
+        <span className="text-xs text-zinc-500">{tr("Descrição (opcional)")}</span>
         <input name="description" className="field" defaultValue={type?.description} maxLength={200} />
       </label>
       <div className="sm:pt-4">
         <button type="submit" className={type ? "btn-secondary w-full" : "btn-primary w-full"} disabled={pending}>
-          {type ? "Salvar" : "+ Criar tipo"}
+          {type ? tr("Salvar") : tr("+ Criar tipo")}
         </button>
       </div>
       <div className="sm:col-span-4">
@@ -58,28 +60,29 @@ export function RoomTypeForm({
 }
 
 export function RoomRangeForm({ types }: { types: TypeOption[] }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(createRoomRangeAction, undefined);
 
   return (
     <form action={action} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-4">
         <label>
-          <span className="text-xs text-zinc-500">Andar</span>
+          <span className="text-xs text-zinc-500">{tr("Andar")}</span>
           <input name="floor" type="number" className="field" defaultValue={1} required />
           <FieldError messages={state?.fieldErrors?.floor} />
         </label>
         <label>
-          <span className="text-xs text-zinc-500">Do número</span>
+          <span className="text-xs text-zinc-500">{tr("Do número")}</span>
           <input name="from" type="number" min={1} className="field" placeholder="101" required />
           <FieldError messages={state?.fieldErrors?.from} />
         </label>
         <label>
-          <span className="text-xs text-zinc-500">Até o número</span>
+          <span className="text-xs text-zinc-500">{tr("Até o número")}</span>
           <input name="to" type="number" min={1} className="field" placeholder="110" required />
           <FieldError messages={state?.fieldErrors?.to} />
         </label>
         <label>
-          <span className="text-xs text-zinc-500">Tipo</span>
+          <span className="text-xs text-zinc-500">{tr("Tipo")}</span>
           <select name="roomTypeId" className="field" required>
             {types.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
@@ -90,13 +93,14 @@ export function RoomRangeForm({ types }: { types: TypeOption[] }) {
       </div>
       <FormMessage error={state?.fieldErrors ? undefined : state?.error} success={state?.success} />
       <button type="submit" className="btn-primary" disabled={pending}>
-        {pending ? "Criando..." : "Criar quartos"}
+        {pending ? tr("Criando...") : tr("Criar quartos")}
       </button>
     </form>
   );
 }
 
 export function RoomRow({ room, types }: { room: RoomView; types: TypeOption[] }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<FormState, FormData>(updateRoomAction, undefined);
   const typeId = types.find((t) => t.name === room.typeName)?.id;
 
@@ -105,15 +109,15 @@ export function RoomRow({ room, types }: { room: RoomView; types: TypeOption[] }
       <input type="hidden" name="id" value={room.id} />
       <div className="grid items-end gap-2 sm:grid-cols-[6rem_5rem_1fr_auto_auto]">
         <label>
-          <span className="text-xs text-zinc-500">Número</span>
+          <span className="text-xs text-zinc-500">{tr("Número")}</span>
           <input name="number" className="field" defaultValue={room.number} required />
         </label>
         <label>
-          <span className="text-xs text-zinc-500">Andar</span>
+          <span className="text-xs text-zinc-500">{tr("Andar")}</span>
           <input name="floor" type="number" className="field" defaultValue={room.floor} required />
         </label>
         <label>
-          <span className="text-xs text-zinc-500">Tipo</span>
+          <span className="text-xs text-zinc-500">{tr("Tipo")}</span>
           <select name="roomTypeId" className="field" defaultValue={typeId}>
             {types.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
@@ -121,14 +125,13 @@ export function RoomRow({ room, types }: { room: RoomView; types: TypeOption[] }
           </select>
         </label>
         <label className="flex items-center gap-2 pb-2 text-sm">
-          <input type="checkbox" name="active" defaultChecked={room.active} /> Ativo
-        </label>
-        <button type="submit" className="btn-secondary" disabled={pending}>Salvar</button>
+          <input type="checkbox" name="active" defaultChecked={room.active} />{" "}{tr("Ativo")}</label>
+        <button type="submit" className="btn-secondary" disabled={pending}>{tr("Salvar")}</button>
       </div>
       <div className="mt-1">
         <FieldError messages={state?.fieldErrors?.number ?? state?.fieldErrors?.floor} />
-        {state?.error && !state.fieldErrors && <span className="text-xs text-red-600">{state.error}</span>}
-        {state?.success && <span className="text-xs text-emerald-700">✓ {state.success}</span>}
+        {state?.error && !state.fieldErrors && <span className="text-xs text-red-600">{tr(state.error)}</span>}
+        {state?.success && <span className="text-xs text-emerald-700">✓ {tr(state.success)}</span>}
       </div>
     </form>
   );

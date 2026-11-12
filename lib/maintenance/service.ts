@@ -26,6 +26,7 @@ export type TicketCard = {
   priority: TicketPriority;
   outOfOrder: boolean;
   place: string; // "Quarto 104" ou o local
+  roomNumber: string | null;
   roomId: string | null;
   assignedToId: string | null;
   assignedToName: string | null;
@@ -72,6 +73,7 @@ function toCard(r: CardRow): TicketCard {
     priority: r.priority,
     outOfOrder: r.outOfOrder,
     place: r.room ? `Quarto ${r.room.number}` : (r.location ?? "—"),
+    roomNumber: r.room?.number ?? null,
     roomId: r.roomId,
     assignedToId: r.assignedToId,
     assignedToName: r.assignedTo?.fullName ?? null,

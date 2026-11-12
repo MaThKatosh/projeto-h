@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import { vehicleExitAction } from "../reservas/actions";
 
+import { useT } from "@/components/i18n";
 export function ExitButton({ vehicleId }: { vehicleId: string }) {
+  const tr = useT();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   return (
@@ -18,10 +20,8 @@ export function ExitButton({ vehicleId }: { vehicleId: string }) {
             if (!r.ok) setError(r.error ?? "Não foi possível.");
           })
         }
-      >
-        Registrar saída
-      </button>
-      {error && <span className="block text-xs text-red-600">{error}</span>}
+      >{tr("Registrar saída")}</button>
+      {error && <span className="block text-xs text-red-600">{tr(error)}</span>}
     </>
   );
 }

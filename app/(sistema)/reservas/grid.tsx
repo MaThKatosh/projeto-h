@@ -3,6 +3,7 @@ import { addDays, formatDate, isWeekend, nightsBetween, weekday, type DateStr } 
 import { STATUS } from "@/lib/reservations/rules";
 import type { ReservationRow } from "@/lib/reservations/service";
 
+import { tServer } from "@/lib/i18n/server";
 type Grid = {
   from: DateStr;
   days: number;
@@ -18,6 +19,7 @@ const HALF = "1.625rem"; // cada dia = 2 metades (manhã | tarde)
 const HEAD = "7rem";
 
 export function ReservationGrid({ grid, today }: { grid: Grid; today: DateStr }) {
+  const tr = tServer();
   const dates = Array.from({ length: grid.days }, (_, i) => addDays(grid.from, i));
   const end = addDays(grid.from, grid.days);
   const types = [...new Map(grid.rooms.map((r) => [r.roomTypeId, r.typeName])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
@@ -29,11 +31,11 @@ export function ReservationGrid({ grid, today }: { grid: Grid; today: DateStr })
       <div className="min-w-max text-xs">
         {/* Cabeçalho de datas */}
         <div className="sticky top-0 z-10 grid border-b border-zinc-200 bg-white" style={{ gridTemplateColumns: template }}>
-          <div className="sticky left-0 bg-white px-2 py-2 font-semibold">Quarto</div>
+          <div className="sticky left-0 bg-white px-2 py-2 font-semibold">{tr("Quarto")}</div>
           {dates.map((d) => (
             <div key={d} style={{ gridColumn: "span 2" }} className={`border-l border-zinc-100 py-1 text-center ${d === today ? "bg-blue-600 text-white" : isWeekend(d) ? "bg-zinc-50" : ""}`}>
               <div className="font-semibold">{formatDate(d)}</div>
-              <div className="opacity-70">{weekday(d)}</div>
+              <div className="opacity-70">{tr(weekday(d))}</div>
             </div>
           ))}
         </div>
@@ -49,7 +51,7 @@ export function ReservationGrid({ grid, today }: { grid: Grid; today: DateStr })
             <div key={typeId}>
               <div className="sticky left-0 bg-zinc-100 px-2 py-1 font-semibold text-zinc-600">{typeName}</div>
               {lanes.map((lane, i) => (
-                <Row key={`u${i}`} template={template} label={<span className="text-amber-700">sem quarto</span>} dates={dates} today={today}>
+                <Row key={`u${i}`} template={template} label={<span className="text-amber-700">{tr("sem quarto")}</span>} dates={dates} today={today}>
                   {lane.map((r) => <Bar key={r.id} r={r} from={grid.from} end={end} />)}
                 </Row>
               ))}
@@ -59,7 +61,7 @@ export function ReservationGrid({ grid, today }: { grid: Grid; today: DateStr })
                   template={template}
                   label={
                     <span>
-                      <b className="text-sm">{room.number}</b> {room.blocked && <span title="Bloqueado">⛔</span>}
+                      <b className="text-sm">{room.number}</b> {room.blocked && <span title={tr("Bloqueado")}>⛔</span>}
                     </span>
                   }
                   dates={dates}
@@ -92,9 +94,10 @@ function Row({
   blocked?: boolean;
   children: React.ReactNode;
 }) {
+  const tr = tServer();
   return (
     <div className="relative grid h-9 border-b border-zinc-100" style={{ gridTemplateColumns: template }}>
-      <div className="sticky left-0 z-[5] flex items-center bg-white px-2">{label}</div>
+      <div className="sticky left-0 z-[5] flex items-center bg-white px-2">{tr(label)}</div>
       {dates.map((d, i) => (
         <div
           key={d}
@@ -111,13 +114,14 @@ function Row({
 // do dia de saída (como nos sistemas de hotel: saída e entrada no mesmo dia
 // não se sobrepõem).
 function Bar({ r, from, end }: { r: ReservationRow; from: DateStr; end: DateStr }) {
+  const tr = tServer();
   // Linha da grade: dia i ocupa as colunas 2+2i (manhã) e 3+2i (tarde).
   const startLine = r.checkIn < from ? 2 : 3 + 2 * nightsBetween(from, r.checkIn);
   const endLine = r.checkOut > end ? 2 + 2 * nightsBetween(from, end) : 3 + 2 * nightsBetween(from, r.checkOut);
   return (
     <Link
       href={`/reservas/${r.id}`}
-      title={`nº ${r.number} · ${r.guestName} · ${formatDate(r.checkIn)} → ${formatDate(r.checkOut)} · ${STATUS[r.status].label}`}
+      title={tr("nº {0} · {1} · {2} → {3} · {4}", [r.number, r.guestName, formatDate(r.checkIn), formatDate(r.checkOut), tr(STATUS[r.status].label)])}
       className={`relative z-[1] mx-[3px] my-1 flex items-center truncate rounded-md px-1.5 font-semibold shadow-sm hover:ring-2 hover:ring-blue-400 ${STATUS[r.status].bar}`}
       style={{ gridColumn: `${startLine} / ${endLine}`, gridRow: 1 }}
     >

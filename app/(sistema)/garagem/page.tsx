@@ -9,9 +9,11 @@ import { LiveRefresher } from "@/components/live-refresher";
 import { dateTime } from "@/components/time";
 import { ExitButton } from "./exit-button";
 
+import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
 
 export default async function GaragemPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const tr = await getT();
   const { user } = await requirePermission("reservations.view");
   const db = getDb();
   const [cars, today, { q = "" }] = await Promise.all([garage(db), getBusinessDate(db), searchParams]);
@@ -23,33 +25,30 @@ export default async function GaragemPage({ searchParams }: { searchParams: Prom
     <div className="max-w-5xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Garagem</h1>
+          <h1 className="text-2xl font-bold">{tr("Garagem")}</h1>
           <LiveRefresher types={["reservations.changed"]} />
         </div>
         <div className="card px-4 py-2">
-          <div className="text-xs text-zinc-500">Veículos na garagem</div>
+          <div className="text-xs text-zinc-500">{tr("Veículos na garagem")}</div>
           <div className="text-2xl font-bold">{cars.length}</div>
         </div>
       </div>
-      <p className="text-sm text-zinc-500">
-        Veículos entram pelo check-in ou pelo botão “Veículo” na reserva do hóspede. No check-out a saída é registrada sozinha.
-        A cobrança de estacionamento entra na Fase 4.
-      </p>
+      <p className="text-sm text-zinc-500">{tr("Veículos entram pelo check-in ou pelo botão “Veículo” na reserva do hóspede. No check-out a saída é registrada sozinha.")}</p>
       <form className="flex gap-2" action="/garagem">
-        <input name="q" defaultValue={q} className="field max-w-xs" placeholder="Buscar placa ou quarto" />
-        <button className="btn-secondary">Buscar</button>
+        <input name="q" defaultValue={q} className="field max-w-xs" placeholder={tr("Buscar placa ou quarto")} />
+        <button className="btn-secondary">{tr("Buscar")}</button>
       </form>
 
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-zinc-50 text-left text-xs text-zinc-500">
             <tr>
-              <th className="px-3 py-2">Placa</th>
-              <th className="px-3 py-2">Veículo</th>
-              <th className="px-3 py-2">Vaga</th>
-              <th className="px-3 py-2">Quarto / hóspede</th>
-              <th className="px-3 py-2">Entrou</th>
-              <th className="px-3 py-2">Sai</th>
+              <th className="px-3 py-2">{tr("Placa")}</th>
+              <th className="px-3 py-2">{tr("Veículo")}</th>
+              <th className="px-3 py-2">{tr("Vaga")}</th>
+              <th className="px-3 py-2">{tr("Quarto / hóspede")}</th>
+              <th className="px-3 py-2">{tr("Entrou")}</th>
+              <th className="px-3 py-2">{tr("Sai")}</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -70,7 +69,7 @@ export default async function GaragemPage({ searchParams }: { searchParams: Prom
             ))}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-zinc-500">{term ? "Nenhum veículo com essa busca." : "Garagem vazia."}</td>
+                <td colSpan={7} className="px-3 py-8 text-center text-zinc-500">{term ? tr("Nenhum veículo com essa busca.") : tr("Garagem vazia.")}</td>
               </tr>
             )}
           </tbody>

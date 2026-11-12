@@ -8,6 +8,7 @@ import { runReport } from "@/lib/reports/run";
 import { PrintButton } from "./print-button";
 import { dateTime } from "@/components/time";
 
+import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
 
 export default async function RelatorioPage({
@@ -17,6 +18,7 @@ export default async function RelatorioPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ de?: string; ate?: string; filtro?: string }>;
 }) {
+  const tr = await getT();
   const { user } = await verifySession();
   const { slug } = await params;
   const query = await searchParams;
@@ -25,60 +27,60 @@ export default async function RelatorioPage({
   const { def, from, to, filter, result } = data;
   const t = totals(result);
   const qs = new URLSearchParams({ de: from, ate: to, ...(filter ? { filtro: filter } : {}) }).toString();
-  const period = def.period === "none" ? "agora" : def.period === "day" ? formatDate(from, true) : from === to ? formatDate(from, true) : `${formatDate(from, true)} a ${formatDate(to, true)}`;
+  const period = def.period === "none" ? tr("agora") : def.period === "day" ? formatDate(from, true) : from === to ? formatDate(from, true) : tr("{0} a {1}", [formatDate(from, true), formatDate(to, true)]);
 
   return (
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/relatorios" className="text-sm text-blue-700 underline">← Relatórios</Link>
-          <h1 className="text-2xl font-bold">{def.title}</h1>
-          <p className="text-sm text-zinc-500">{def.description}</p>
+          <Link href="/relatorios" className="text-sm text-blue-700 underline">{tr("← Relatórios")}</Link>
+          <h1 className="text-2xl font-bold">{tr(def.title)}</h1>
+          <p className="text-sm text-zinc-500">{tr(def.description)}</p>
         </div>
         <div className="flex gap-2">
           <PrintButton />
-          <a className="btn-secondary" href={`/relatorios/${def.slug}/arquivo?${qs}`}>⬇ Excel (CSV)</a>
+          <a className="btn-secondary" href={`/relatorios/${def.slug}/arquivo?${qs}`}>{tr("⬇ Excel (CSV)")}</a>
         </div>
       </div>
 
       {def.period !== "none" && (
         <form className="no-print card flex flex-wrap items-end gap-3 p-3" action={`/relatorios/${def.slug}`}>
           <label>
-            <span className="text-xs text-zinc-500">{def.period === "day" ? "Dia" : "De"}</span>
+            <span className="text-xs text-zinc-500">{def.period === "day" ? tr("Dia") : tr("De")}</span>
             <input type="date" name="de" defaultValue={from} className="field" />
           </label>
           {def.period === "range" && (
             <label>
-              <span className="text-xs text-zinc-500">Até</span>
+              <span className="text-xs text-zinc-500">{tr("Até")}</span>
               <input type="date" name="ate" defaultValue={to} className="field" />
             </label>
           )}
           {def.filter && (
             <label>
-              <span className="text-xs text-zinc-500">{def.filter.label}</span>
+              <span className="text-xs text-zinc-500">{tr(def.filter.label)}</span>
               <select name="filtro" defaultValue={filter ?? ""} className="field">
-                <option value="">Todos</option>
+                <option value="">{tr("Todos")}</option>
                 {def.filter.options.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{tr(o.label)}</option>
                 ))}
               </select>
             </label>
           )}
-          <button className="btn-primary">Ver</button>
+          <button className="btn-primary">{tr("Ver")}</button>
         </form>
       )}
 
       {/* Cabeçalho que só aparece na impressão */}
       <div className="print-only">
-        <h1 className="text-xl font-bold">{def.title}</h1>
-        <p className="text-sm">Período: {period}{filter ? ` · ${def.filter?.options.find((o) => o.value === filter)?.label}` : ""} · emitido por {user.fullName} em {dateTime(data.generatedAt)}</p>
+        <h1 className="text-xl font-bold">{tr(def.title)}</h1>
+        <p className="text-sm">{tr("Período: {0}{1} · emitido por {2} em", [period, filter ? " · " + tr(def.filter?.options.find((o) => o.value === filter)?.label) : "", user.fullName])}{" "}{dateTime(data.generatedAt)}</p>
       </div>
 
       {result.summary && result.summary.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {result.summary.map((s) => (
             <div key={s.label} className="card px-4 py-2">
-              <div className="text-xs text-zinc-500">{s.label}</div>
+              <div className="text-xs text-zinc-500">{tr(s.label)}</div>
               <div className="text-lg font-bold">{s.value}</div>
             </div>
           ))}
@@ -90,7 +92,7 @@ export default async function RelatorioPage({
           <thead className="bg-zinc-50 text-left text-xs text-zinc-500">
             <tr>
               {result.columns.map((c) => (
-                <th key={c.key} className={`px-3 py-2 whitespace-nowrap ${isNumeric(c.type) ? "text-right" : ""}`}>{c.label}</th>
+                <th key={c.key} className={`px-3 py-2 whitespace-nowrap ${isNumeric(c.type) ? "text-right" : ""}`}>{tr(c.label)}</th>
               ))}
             </tr>
           </thead>
@@ -106,7 +108,7 @@ export default async function RelatorioPage({
             ))}
             {result.rows.length === 0 && (
               <tr>
-                <td colSpan={result.columns.length} className="px-3 py-8 text-center text-zinc-400">Nada encontrado neste período.</td>
+                <td colSpan={result.columns.length} className="px-3 py-8 text-center text-zinc-400">{tr("Nada encontrado neste período.")}</td>
               </tr>
             )}
           </tbody>
@@ -115,7 +117,7 @@ export default async function RelatorioPage({
               <tr>
                 {result.columns.map((c, i) => (
                   <td key={c.key} className={`px-3 py-2 ${isNumeric(c.type) ? "text-right whitespace-nowrap" : ""}`}>
-                    {i === 0 ? `Total (${result.rows.length})` : c.key in t ? formatCell(t[c.key], c.type) : ""}
+                    {i === 0 ? tr("Total ({0})", [result.rows.length]) : c.key in t ? formatCell(t[c.key], c.type) : ""}
                   </td>
                 ))}
               </tr>
@@ -123,7 +125,7 @@ export default async function RelatorioPage({
           )}
         </table>
       </div>
-      {result.note && <p className="text-xs text-zinc-500">{result.note}</p>}
+      {result.note && <p className="text-xs text-zinc-500">{tr(result.note)}</p>}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { useNow } from "@/components/use-now";
 import { clock } from "@/components/time";
 import { itemStatusAction } from "../restaurante/actions";
 
+import { useT } from "@/components/i18n";
 type KItem = {
   id: string;
   name: string;
@@ -21,6 +22,7 @@ type KItem = {
 };
 
 export function KitchenBoard({ items, serverNow }: { items: KItem[]; serverNow: number }) {
+  const tr = useT();
   const router = useRouter();
   const connected = useLiveRefresh(["restaurant.changed"]);
   // O relógio começa no maior entre a hora do servidor e a do navegador.
@@ -49,15 +51,15 @@ export function KitchenBoard({ items, serverNow }: { items: KItem[]; serverNow: 
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">👨‍🍳 Cozinha</h1>
+          <h1 className="text-2xl font-bold">{tr("👨‍🍳 Cozinha")}</h1>
           <LiveDot connected={connected} />
         </div>
         <div className="flex gap-2 text-sm">
-          <span className="card px-4 py-2"><b className="text-lg">{todo.length}</b> para preparar</span>
-          <span className="card px-4 py-2"><b className="text-lg">{ready.length}</b> prontos aguardando o garçom</span>
+          <span className="card px-4 py-2"><b className="text-lg">{todo.length}</b>{" "}{tr("para preparar")}</span>
+          <span className="card px-4 py-2"><b className="text-lg">{ready.length}</b>{" "}{tr("prontos aguardando o garçom")}</span>
         </div>
       </div>
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{tr(error)}</p>}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tickets.map((t) => {
@@ -67,19 +69,17 @@ export function KitchenBoard({ items, serverNow }: { items: KItem[]; serverNow: 
             <section key={t.comandaId} className={`rounded-2xl border-2 p-4 shadow-sm ${tone}`}>
               <div className="mb-2 flex items-baseline justify-between">
                 <span className="text-2xl font-black">{t.place}</span>
-                <span className={`text-sm font-bold ${minutes >= 20 ? "text-red-700" : ""}`}>{minutes} min</span>
+                <span className={`text-sm font-bold ${minutes >= 20 ? "text-red-700" : ""}`}>{minutes}{" "}{tr("min")}</span>
               </div>
-              <div className="mb-3 text-xs text-zinc-500">comanda nº {t.comandaNumber} · pedido às {clock(t.lines[0].createdAt)}</div>
+              <div className="mb-3 text-xs text-zinc-500">{tr("comanda nº {0} · pedido às", [t.comandaNumber])}{" "}{clock(t.lines[0].createdAt)}</div>
               <ul className="space-y-2">
                 {t.lines.map((i) => (
                   <li key={i.id} className="flex items-center justify-between gap-2 rounded-lg bg-white p-2 shadow-sm">
                     <div>
-                      <div className="text-lg font-bold">{i.quantity}× {i.name}</div>
+                      <div className="text-lg font-bold">{i.quantity}{tr("×")}{" "}{i.name}</div>
                       {i.notes && <div className="text-sm font-semibold text-red-700">⚠ {i.notes}</div>}
                     </div>
-                    <button className="btn bg-emerald-600 px-4 py-3 text-white hover:bg-emerald-700" disabled={pending} onClick={() => mark(i.id, "PRONTO")}>
-                      Pronto
-                    </button>
+                    <button className="btn bg-emerald-600 px-4 py-3 text-white hover:bg-emerald-700" disabled={pending} onClick={() => mark(i.id, "PRONTO")}>{tr("Pronto")}</button>
                   </li>
                 ))}
               </ul>
@@ -87,20 +87,17 @@ export function KitchenBoard({ items, serverNow }: { items: KItem[]; serverNow: 
           );
         })}
         {tickets.length === 0 && (
-          <p className="rounded-2xl border-2 border-dashed border-zinc-300 p-8 text-center text-zinc-400 sm:col-span-2 xl:col-span-3">
-            Nenhum pedido para preparar. 🎉
-          </p>
+          <p className="rounded-2xl border-2 border-dashed border-zinc-300 p-8 text-center text-zinc-400 sm:col-span-2 xl:col-span-3">{tr("Nenhum pedido para preparar. 🎉")}</p>
         )}
       </div>
 
       {ready.length > 0 && (
         <section>
-          <h2 className="mb-2 font-semibold">Prontos aguardando o garçom</h2>
+          <h2 className="mb-2 font-semibold">{tr("Prontos aguardando o garçom")}</h2>
           <div className="flex flex-wrap gap-2">
             {ready.map((i) => (
               <div key={i.id} className="flex items-center gap-2 rounded-xl bg-emerald-100 px-3 py-2 text-sm">
-                <b>{i.place}</b> {i.quantity}× {i.name}
-                <button className="text-xs text-emerald-900 underline" disabled={pending} onClick={() => mark(i.id, "ENTREGUE")}>entregue</button>
+                <b>{i.place}</b>{" "}{tr("{0}× {1}", [i.quantity, i.name])}<button className="text-xs text-emerald-900 underline" disabled={pending} onClick={() => mark(i.id, "ENTREGUE")}>{tr("entregue")}</button>
               </div>
             ))}
           </div>

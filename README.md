@@ -81,4 +81,5 @@ docs/               uma página por fase
 - [x] **Fase 4** — conta do quarto, pagamentos, estornos, check-out com conta zerada, borderô ([docs/FASE-4.md](docs/FASE-4.md))
 - [x] **Fase 5** — restaurante (salão, comandas, cozinha), frigobar e cardápio, lançando na conta do quarto ([docs/FASE-5.md](docs/FASE-5.md))
 - [x] **Fase 6** — auditoria noturna (lança diárias, guarda os números do dia, vira a data) e 17 relatórios com impressão e Excel ([docs/FASE-6.md](docs/FASE-6.md))
+- [x] **Extra** — tela de Configurações, bandeiras de cartão, botões de desfazer (auditoria, check-in, check-out, cancelamento) e idiomas PT/EN/ES ([docs/CONFIGURACOES.md](docs/CONFIGURACOES.md))
 - [ ] Fase 7 — apps instalados (Windows, Mac, Linux, celular) e integração com portais

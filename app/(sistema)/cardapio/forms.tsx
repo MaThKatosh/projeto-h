@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { centsToInput } from "@/lib/money";
 import { saveMenuItemAction, saveServiceFeeAction, saveTableAction, type ActionResult } from "../restaurante/actions";
 
+import { useT } from "@/components/i18n";
 function useSave() {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok?: boolean; text?: string }>({});
@@ -20,6 +21,7 @@ function useSave() {
 type Item = { id: string; name: string; group: string; priceCents: number; kitchen: boolean; active: boolean };
 
 export function MenuRow({ item, outlet }: { item?: Item; outlet: "RESTAURANTE" | "FRIGOBAR" }) {
+  const tr = useT();
   const { pending, msg, save } = useSave();
   return (
     <form
@@ -44,30 +46,31 @@ export function MenuRow({ item, outlet }: { item?: Item; outlet: "RESTAURANTE" |
       }}
     >
       <label>
-        {!item && <span className="text-xs text-zinc-500">Novo item</span>}
-        <input name="name" className="field" defaultValue={item?.name} placeholder="Nome" required />
+        {!item && <span className="text-xs text-zinc-500">{tr("Novo item")}</span>}
+        <input name="name" className="field" defaultValue={item?.name} placeholder={tr("Nome")} required />
       </label>
-      <input name="group" className="field" defaultValue={item?.group ?? (outlet === "FRIGOBAR" ? "Bebidas" : "")} placeholder="Grupo (ex.: Pratos)" required />
-      <input name="price" className="field" inputMode="decimal" defaultValue={item ? centsToInput(item.priceCents) : ""} placeholder="R$ 0,00" required />
+      <input name="group" className="field" defaultValue={item?.group ?? (outlet === "FRIGOBAR" ? "Bebidas" : "")} placeholder={tr("Grupo (ex.: Pratos)")} required />
+      <input name="price" className="field" inputMode="decimal" defaultValue={item ? centsToInput(item.priceCents) : ""} placeholder={tr("R$ 0,00")} required />
       {outlet === "RESTAURANTE" ? (
-        <label className="flex items-center gap-1 pb-2 text-xs"><input type="checkbox" name="kitchen" defaultChecked={item?.kitchen ?? true} /> Cozinha</label>
+        <label className="flex items-center gap-1 pb-2 text-xs"><input type="checkbox" name="kitchen" defaultChecked={item?.kitchen ?? true} />{" "}{tr("Cozinha")}</label>
       ) : (
         <span />
       )}
       {item ? (
-        <label className="flex items-center gap-1 pb-2 text-xs"><input type="checkbox" name="active" defaultChecked={item.active} /> Ativo</label>
+        <label className="flex items-center gap-1 pb-2 text-xs"><input type="checkbox" name="active" defaultChecked={item.active} />{" "}{tr("Ativo")}</label>
       ) : (
         <span />
       )}
       <div className="flex items-center gap-2">
-        <button className={item ? "btn-secondary px-3 py-1.5" : "btn-primary px-3 py-1.5"} disabled={pending}>{item ? "Salvar" : "+ Criar"}</button>
-        {msg.text && <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span>}
+        <button className={item ? "btn-secondary px-3 py-1.5" : "btn-primary px-3 py-1.5"} disabled={pending}>{item ? tr("Salvar") : tr("+ Criar")}</button>
+        {msg.text && <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{tr(msg.text)}</span>}
       </div>
     </form>
   );
 }
 
 export function TableRow({ table }: { table?: { id: string; name: string; seats: number; active: boolean } }) {
+  const tr = useT();
   const { pending, msg, save } = useSave();
   return (
     <form
@@ -83,24 +86,24 @@ export function TableRow({ table }: { table?: { id: string; name: string; seats:
         );
       }}
     >
-      <input name="name" className="field w-28" defaultValue={table?.name} placeholder="Mesa (nº)" required />
+      <input name="name" className="field w-28" defaultValue={table?.name} placeholder={tr("Mesa (nº)")} required />
       <label className="flex items-center gap-1 text-xs">
-        <input name="seats" type="number" min={1} max={30} className="field w-16" defaultValue={table?.seats ?? 4} /> lugares
-      </label>
-      {table && <label className="flex items-center gap-1 text-xs"><input type="checkbox" name="active" defaultChecked={table.active} /> Ativa</label>}
-      <button className={table ? "btn-secondary px-3 py-1.5" : "btn-primary px-3 py-1.5"} disabled={pending}>{table ? "Salvar" : "+ Mesa"}</button>
-      {msg.text && <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span>}
+        <input name="seats" type="number" min={1} max={30} className="field w-16" defaultValue={table?.seats ?? 4} />{" "}{tr("lugares")}</label>
+      {table && <label className="flex items-center gap-1 text-xs"><input type="checkbox" name="active" defaultChecked={table.active} />{" "}{tr("Ativa")}</label>}
+      <button className={table ? "btn-secondary px-3 py-1.5" : "btn-primary px-3 py-1.5"} disabled={pending}>{table ? tr("Salvar") : tr("+ Mesa")}</button>
+      {msg.text && <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{tr(msg.text)}</span>}
     </form>
   );
 }
 
 export function ServiceFeeForm({ percent }: { percent: number }) {
+  const tr = useT();
   const [value, setValue] = useState(String(percent).replace(".", ","));
   const { pending, msg, save } = useSave();
   return (
     <section className="card space-y-3 p-5">
-      <h2 className="font-semibold">Taxa de serviço</h2>
-      <p className="text-sm text-zinc-500">Percentual sugerido nas comandas novas (o garçom pode tirar em cada comanda). Use 0 para não cobrar.</p>
+      <h2 className="font-semibold">{tr("Taxa de serviço")}</h2>
+      <p className="text-sm text-zinc-500">{tr("Percentual sugerido nas comandas novas (o garçom pode tirar em cada comanda). Use 0 para não cobrar.")}</p>
       <form
         className="flex items-center gap-2"
         onSubmit={(e) => {
@@ -109,8 +112,8 @@ export function ServiceFeeForm({ percent }: { percent: number }) {
         }}
       >
         <input className="field w-20" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} /> %
-        <button className="btn-secondary" disabled={pending}>Salvar</button>
-        {msg.text && <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span>}
+        <button className="btn-secondary" disabled={pending}>{tr("Salvar")}</button>
+        {msg.text && <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{tr(msg.text)}</span>}
       </form>
     </section>
   );

@@ -6,9 +6,11 @@ import { getServiceFeeBp } from "@/lib/restaurant/service";
 import { formatBRL } from "@/lib/money";
 import { BrandRow, HotelForm } from "./forms";
 
+import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
+  const tr = await getT();
   await requirePermission("settings.manage");
   const db = getDb();
   const [settings, brands, rooms, types, plans, menu, tables, users, parking, fee, lastRun] = await Promise.all([
@@ -27,18 +29,18 @@ export default async function ConfiguracoesPage() {
   const count = (o: string) => menu.find((m) => m.outlet === o)?._count ?? 0;
 
   const shortcuts = [
-    { href: "/quartos", icon: "🏨", title: "Quartos e tipos", text: `${rooms} quartos ativos em ${types} tipos. Criar vários de uma vez, desativar, mudar tipo.` },
-    { href: "/tarifas", icon: "💲", title: "Tarifas, ISS e estacionamento", text: `${plans} tarifa(s) ativa(s). Estacionamento: ${parking ? `${formatBRL(parking)} por noite` : "grátis"}.` },
-    { href: "/cardapio", icon: "📋", title: "Cardápios, mesas e taxa de serviço", text: `Restaurante: ${count("RESTAURANTE")} itens · Frigobar: ${count("FRIGOBAR")} itens · ${tables} mesas · serviço ${fee / 100}%.` },
-    { href: "/usuarios", icon: "👥", title: "Usuários e cargos", text: `${users} usuários ativos. Criar, trocar cargo, redefinir senha, desativar.` },
-    { href: "/auditoria", icon: "🌙", title: "Auditoria noturna", text: lastRun ? `Última: ${lastRun.businessDate.toISOString().slice(0, 10).split("-").reverse().join("/")}. Dá para desfazer a última por lá.` : "Nenhuma ainda." },
+    { href: "/quartos", icon: "🏨", title: tr("Quartos e tipos"), text: tr("{0} quartos ativos em {1} tipos. Criar vários de uma vez, desativar, mudar tipo.", [rooms, types]) },
+    { href: "/tarifas", icon: "💲", title: tr("Tarifas, ISS e estacionamento"), text: tr("{0} tarifa(s) ativa(s). Estacionamento: {1}.", [plans, parking ? tr("{0} por noite", [formatBRL(parking)]) : tr("grátis")]) },
+    { href: "/cardapio", icon: "📋", title: tr("Cardápios, mesas e taxa de serviço"), text: tr("Restaurante: {0} itens · Frigobar: {1} itens · {2} mesas · serviço {3}%.", [count("RESTAURANTE"), count("FRIGOBAR"), tables, fee / 100]) },
+    { href: "/usuarios", icon: "👥", title: tr("Usuários e cargos"), text: tr("{0} usuários ativos. Criar, trocar cargo, redefinir senha, desativar.", [users]) },
+    { href: "/auditoria", icon: "🌙", title: tr("Auditoria noturna"), text: lastRun ? tr("Última: {0}. Dá para desfazer a última por lá.", [lastRun.businessDate.toISOString().slice(0, 10).split("-").reverse().join("/")]) : tr("Nenhuma ainda.") },
   ];
 
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="text-sm text-zinc-500">Tudo o que dá para ajustar no sistema, num lugar só.</p>
+        <h1 className="text-2xl font-bold">{tr("Configurações")}</h1>
+        <p className="text-sm text-zinc-500">{tr("Tudo o que dá para ajustar no sistema, num lugar só.")}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -52,26 +54,23 @@ export default async function ConfiguracoesPage() {
       </div>
 
       <section className="card p-5">
-        <h2 className="mb-2 font-semibold">↶ Corrigir erros (gerente e administrador)</h2>
+        <h2 className="mb-2 font-semibold">{tr("↶ Corrigir erros (gerente e administrador)")}</h2>
         <ul className="space-y-2 text-sm">
-          <li><b>Rodei a auditoria por engano / duas vezes</b> → Auditoria noturna → “Desfazer a auditoria”. Estorna as diárias dela e volta a data.</li>
-          <li><b>Check-in no hóspede ou quarto errado</b> → abra a reserva → “Desfazer check-in”.</li>
-          <li><b>Check-out por engano</b> → abra a reserva → “Desfazer check-out” (o hóspede volta para o mesmo quarto).</li>
-          <li><b>Cancelei ou marquei “não compareceu” sem querer</b> → abra a reserva → “Reativar reserva”.</li>
-          <li><b>Lançamento errado na conta</b> (diária, consumo, pagamento) → na conta do quarto, “estornar”.</li>
-          <li><b>Item errado no restaurante</b> → na comanda, “cancelar” o item.</li>
+          <li><b>{tr("Rodei a auditoria por engano / duas vezes")}</b>{" "}{tr("→ Auditoria noturna → “Desfazer a auditoria”. Estorna as diárias dela e volta a data.")}</li>
+          <li><b>{tr("Check-in no hóspede ou quarto errado")}</b>{" "}{tr("→ abra a reserva → “Desfazer check-in”.")}</li>
+          <li><b>{tr("Check-out por engano")}</b>{" "}{tr("→ abra a reserva → “Desfazer check-out” (o hóspede volta para o mesmo quarto).")}</li>
+          <li><b>{tr("Cancelei ou marquei “não compareceu” sem querer")}</b>{" "}{tr("→ abra a reserva → “Reativar reserva”.")}</li>
+          <li><b>{tr("Lançamento errado na conta")}</b>{" "}{tr("(diária, consumo, pagamento) → na conta do quarto, “estornar”.")}</li>
+          <li><b>{tr("Item errado no restaurante")}</b>{" "}{tr("→ na comanda, “cancelar” o item.")}</li>
         </ul>
-        <p className="mt-2 text-xs text-zinc-500">Tudo pede um motivo e fica registrado (histórico da reserva e relatório “Registro de ações”).</p>
+        <p className="mt-2 text-xs text-zinc-500">{tr("Tudo pede um motivo e fica registrado (histórico da reserva e relatório “Registro de ações”).")}</p>
       </section>
 
       <HotelForm settings={settings} />
 
       <section className="card space-y-2 p-5">
-        <h2 className="font-semibold">💳 Bandeiras de cartão</h2>
-        <p className="text-sm text-zinc-500">
-          Aparecem para escolha nos pagamentos com cartão (conta do quarto e restaurante) e no borderô. Desative as que a sua
-          maquininha não aceita; a ordem define a posição na tela.
-        </p>
+        <h2 className="font-semibold">{tr("💳 Bandeiras de cartão")}</h2>
+        <p className="text-sm text-zinc-500">{tr("Aparecem para escolha nos pagamentos com cartão (conta do quarto e restaurante) e no borderô. Desative as que a sua maquininha não aceita; a ordem define a posição na tela.")}</p>
         {brands.map((b) => (
           <BrandRow key={b.id} brand={b} />
         ))}

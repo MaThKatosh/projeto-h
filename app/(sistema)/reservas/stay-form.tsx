@@ -21,6 +21,7 @@ import {
   walkInAction,
 } from "./actions";
 
+import { useT } from "@/components/i18n";
 type Mode = "nova" | "direto" | "editar";
 type RoomOption = { id: string; number: string; roomTypeId: string; typeName: string; problem?: boolean };
 
@@ -60,6 +61,7 @@ export function StayForm({
   inHouse?: boolean;
   onDone?: () => void;
 }) {
+  const tr = useT();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, start] = useTransition();
@@ -173,7 +175,7 @@ export function StayForm({
     !roomTypeId && (mode === "direto" ? "escolha o quarto (ou o tipo de quarto)" : "escolha o tipo de quarto"),
     mode === "direto" && roomTypeId && !roomId && "escolha o quarto",
     dailyCents === null && "informe o valor da diária",
-  ].filter(Boolean) as string[];
+  ].filter(Boolean).map((m) => tr(m as string));
 
   return (
     <form
@@ -187,24 +189,24 @@ export function StayForm({
       {/* HÓSPEDE */}
       {mode !== "editar" && (
         <section className="card space-y-3 p-5">
-          <h2 className="font-semibold">1. Hóspede</h2>
+          <h2 className="font-semibold">{tr("1. Hóspede")}</h2>
           {mode === "nova" && !newGuest && !guest && <GuestSearch onPick={setGuest} onNew={() => setNewGuest(true)} />}
           {guest && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50 p-3">
               <div>
                 <div className="font-semibold">{guest.fullName}</div>
                 <div className="text-xs text-zinc-600">
-                  {[guest.docType && guest.docNumber ? `${guest.docType} ${guest.docNumber}` : null, guest.phone, guest.email].filter(Boolean).join(" · ") || "sem contato"}
+                  {[guest.docType && guest.docNumber ? `${guest.docType} ${guest.docNumber}` : null, guest.phone, guest.email].filter(Boolean).join(" · ") || tr("sem contato")}
                 </div>
               </div>
-              <button type="button" className="text-sm text-blue-700 underline" onClick={() => setGuest(null)}>trocar</button>
+              <button type="button" className="text-sm text-blue-700 underline" onClick={() => setGuest(null)}>{tr("trocar")}</button>
             </div>
           )}
           {newGuest && (
             <>
               <GuestFields errors={fe} requireDoc={mode === "direto"} />
               {mode === "nova" && (
-                <button type="button" className="text-sm text-blue-700 underline" onClick={() => setNewGuest(false)}>← buscar hóspede já cadastrado</button>
+                <button type="button" className="text-sm text-blue-700 underline" onClick={() => setNewGuest(false)}>{tr("← buscar hóspede já cadastrado")}</button>
               )}
             </>
           )}
@@ -213,10 +215,10 @@ export function StayForm({
 
       {/* DATAS E QUARTO */}
       <section className="card space-y-4 p-5">
-        <h2 className="font-semibold">{mode === "editar" ? "Estadia" : "2. Estadia"}</h2>
+        <h2 className="font-semibold">{mode === "editar" ? tr("Estadia") : tr("2. Estadia")}</h2>
         <div className="grid gap-3 sm:grid-cols-4">
           <label>
-            <span className="text-xs text-zinc-500">Entrada</span>
+            <span className="text-xs text-zinc-500">{tr("Entrada")}</span>
             <input
               type="date"
               className="field"
@@ -231,27 +233,25 @@ export function StayForm({
             <FieldError messages={fe?.checkIn} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Saída</span>
+            <span className="text-xs text-zinc-500">{tr("Saída")}</span>
             <input type="date" className="field" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} />
             <FieldError messages={fe?.checkOut} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Adultos</span>
+            <span className="text-xs text-zinc-500">{tr("Adultos")}</span>
             <input type="number" min={1} max={20} className="field" value={adults} onChange={(e) => setAdults(Number(e.target.value))} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Crianças</span>
+            <span className="text-xs text-zinc-500">{tr("Crianças")}</span>
             <input type="number" min={0} max={20} className="field" value={children} onChange={(e) => setChildren(Number(e.target.value))} />
           </label>
         </div>
         {validDates && (
-          <p className="text-sm text-zinc-600">
-            {nights} {nights === 1 ? "noite" : "noites"}: {formatDate(checkIn)} a {formatDate(checkOut)}
-          </p>
+          <p className="text-sm text-zinc-600">{tr("{0} {1}: {2} a {3}", [nights, nights === 1 ? tr("noite") : tr("noites"), formatDate(checkIn), formatDate(checkOut)])}</p>
         )}
 
         <div>
-          <div className="mb-1 text-xs text-zinc-500">Tipo de quarto — livres em todas as noites</div>
+          <div className="mb-1 text-xs text-zinc-500">{tr("Tipo de quarto — livres em todas as noites")}</div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {(avail ?? types.map((t) => ({ roomTypeId: t.id, name: t.name, capacity: t.capacity, free: NaN, total: 0, byNight: [] }))).map((a) => {
               const selected = roomTypeId === a.roomTypeId;
@@ -271,9 +271,9 @@ export function StayForm({
                   } ${none && !selected ? "opacity-50" : ""} disabled:cursor-not-allowed`}
                 >
                   <div className="font-semibold">{a.name}</div>
-                  <div className="text-xs text-zinc-500">até {a.capacity} pessoas</div>
+                  <div className="text-xs text-zinc-500">{tr("até {0} pessoas", [a.capacity])}</div>
                   <div className={`mt-1 text-sm font-bold ${Number.isNaN(a.free) ? "text-zinc-400" : none ? "text-red-600" : "text-emerald-700"}`}>
-                    {Number.isNaN(a.free) ? "…" : none ? "Esgotado" : `${a.free} livre${a.free > 1 ? "s" : ""}`}
+                    {Number.isNaN(a.free) ? "…" : none ? tr("Esgotado") : tr("{0} livre{1}", [a.free, a.free > 1 ? tr("s") : ""])}
                   </div>
                 </button>
               );
@@ -281,16 +281,14 @@ export function StayForm({
           </div>
           <FieldError messages={fe?.roomTypeId} />
           {typeCapacity !== undefined && adults + children > typeCapacity && (
-            <p className="mt-1 text-xs text-amber-700">Atenção: {adults + children} pessoas para um quarto de até {typeCapacity}.</p>
+            <p className="mt-1 text-xs text-amber-700">{tr("Atenção: {0} pessoas para um quarto de até {1}.", [adults + children, typeCapacity])}</p>
           )}
         </div>
 
         {!inHouse && (
           <div>
             <label className="block">
-              <span className="text-xs text-zinc-500">
-                Quarto {mode === "direto" ? "* (só aparecem quartos limpos e livres)" : "(opcional — pode escolher depois)"}
-              </span>
+              <span className="text-xs text-zinc-500">{tr("Quarto {0}", [mode === "direto" ? tr("* (só aparecem quartos limpos e livres)") : tr("(opcional — pode escolher depois)")])}</span>
               <select
                 className="field"
                 value={roomId}
@@ -305,21 +303,19 @@ export function StayForm({
                   }
                 }}
               >
-                <option value="">{mode === "direto" ? "Escolha o quarto" : "Escolher depois"}</option>
+                <option value="">{mode === "direto" ? tr("Escolha o quarto") : tr("Escolher depois")}</option>
                 {roomChoices.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.number} — {r.typeName}{r.problem ? " (⚠ tem problema aberto)" : ""}
+                    {r.number} — {r.typeName}{r.problem ? tr(" (⚠ tem problema aberto)") : ""}
                   </option>
                 ))}
               </select>
             </label>
             <FieldError messages={fe?.roomId} />
             <label className="mt-1 flex items-center gap-2 text-xs text-zinc-600">
-              <input type="checkbox" checked={showOtherTypes} onChange={(e) => setShowOtherTypes(e.target.checked)} />
-              mostrar quartos de outros tipos (upgrade)
-            </label>
+              <input type="checkbox" checked={showOtherTypes} onChange={(e) => setShowOtherTypes(e.target.checked)} />{tr("mostrar quartos de outros tipos (upgrade)")}</label>
             {rooms && roomChoices.length === 0 && roomTypeId && (
-              <p className="text-xs text-amber-700">Nenhum quarto deste tipo {mode === "direto" ? "limpo e livre agora" : "livre nessas datas"}.</p>
+              <p className="text-xs text-amber-700">{tr("Nenhum quarto deste tipo {0}.", [mode === "direto" ? tr("limpo e livre agora") : tr("livre nessas datas")])}</p>
             )}
           </div>
         )}
@@ -327,10 +323,10 @@ export function StayForm({
 
       {/* VALORES */}
       <section className="card space-y-4 p-5">
-        <h2 className="font-semibold">{mode === "editar" ? "Valores e origem" : "3. Valores e origem"}</h2>
+        <h2 className="font-semibold">{mode === "editar" ? tr("Valores e origem") : tr("3. Valores e origem")}</h2>
         <div className="grid gap-3 sm:grid-cols-4">
           <label>
-            <span className="text-xs text-zinc-500">Tarifa</span>
+            <span className="text-xs text-zinc-500">{tr("Tarifa")}</span>
             <select
               className="field"
               value={ratePlanId}
@@ -339,72 +335,70 @@ export function StayForm({
                 applyPlan(e.target.value, roomTypeId);
               }}
             >
-              <option value="">Sem tarifa (valor manual)</option>
+              <option value="">{tr("Sem tarifa (valor manual)")}</option>
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Diária (R$)</span>
+            <span className="text-xs text-zinc-500">{tr("Diária (R$)")}</span>
             <input className="field" inputMode="decimal" value={daily} onChange={(e) => setDaily(e.target.value)} placeholder="0,00" required />
             <FieldError messages={fe?.daily} />
           </label>
           <label className="flex items-center gap-2 pt-5 text-sm">
-            <input type="checkbox" checked={breakfast} onChange={(e) => setBreakfast(e.target.checked)} /> Café da manhã
-          </label>
+            <input type="checkbox" checked={breakfast} onChange={(e) => setBreakfast(e.target.checked)} />{" "}{tr("Café da manhã")}</label>
           <div className="flex items-center gap-2 pt-5 text-sm">
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={chargeIss} onChange={(e) => setChargeIss(e.target.checked)} /> ISS
-            </label>
-            <input className="field w-16" inputMode="decimal" value={issPercent} disabled={!chargeIss} onChange={(e) => setIssPercent(e.target.value)} aria-label="Alíquota do ISS" />%
+              <input type="checkbox" checked={chargeIss} onChange={(e) => setChargeIss(e.target.checked)} />{" "}{tr("ISS")}</label>
+            <input className="field w-16" inputMode="decimal" value={issPercent} disabled={!chargeIss} onChange={(e) => setIssPercent(e.target.value)} aria-label={tr("Alíquota do ISS")} />%
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <label>
-            <span className="text-xs text-zinc-500">Origem</span>
+            <span className="text-xs text-zinc-500">{tr("Origem")}</span>
             <select className="field" value={source} onChange={(e) => setSource(e.target.value as Source)}>
               {SOURCES.map((s) => (
-                <option key={s} value={s}>{SOURCE_LABEL[s]}</option>
+                <option key={s} value={s}>{tr(SOURCE_LABEL[s])}</option>
               ))}
             </select>
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Nº no portal (se houver)</span>
+            <span className="text-xs text-zinc-500">{tr("Nº no portal (se houver)")}</span>
             <input name="externalCode" className="field" defaultValue={initial.externalCode ?? ""} maxLength={40} />
           </label>
           <label>
-            <span className="text-xs text-zinc-500">Observações</span>
-            <input name="notes" className="field" defaultValue={initial.notes ?? ""} maxLength={1000} placeholder="Ex.: chega tarde, cama extra" />
+            <span className="text-xs text-zinc-500">{tr("Observações")}</span>
+            <input name="notes" className="field" defaultValue={initial.notes ?? ""} maxLength={1000} placeholder={tr("Ex.: chega tarde, cama extra")} />
           </label>
         </div>
 
         {totals && (
           <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-zinc-50 p-3 text-sm">
-            <span>{totals.nights} × {formatBRL(dailyCents!)} = <b>{formatBRL(totals.lodging)}</b></span>
-            {chargeIss && <span>ISS ({issPercent}%): <b>{formatBRL(totals.iss)}</b></span>}
-            <span className="text-base">Total previsto: <b>{formatBRL(totals.total)}</b></span>
+            <span>{totals.nights}{" "}{tr("× {0} =", [formatBRL(dailyCents!)])}{" "}<b>{formatBRL(totals.lodging)}</b></span>
+            {chargeIss && <span>{tr("ISS ({0}%):", [issPercent])}{" "}<b>{formatBRL(totals.iss)}</b></span>}
+            <span className="text-base">{tr("Total previsto:")}{" "}<b>{formatBRL(totals.total)}</b></span>
           </div>
         )}
       </section>
 
       {mode === "direto" && (
         <section className="card space-y-3 p-5">
-          <h2 className="font-semibold">4. Veículo na garagem (opcional)</h2>
+          <h2 className="font-semibold">{tr("4. Veículo na garagem (opcional)")}</h2>
           <VehicleFields errors={fe} />
         </section>
       )}
 
       <FormMessage error={errors.error} />
       {missing.length > 0 && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Para continuar: {missing.join(" · ")}.</p>
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{tr("Para continuar: {0}.", [missing.join(" · ")])}</p>
       )}
       <div className="flex gap-2">
         <button type="submit" className="btn-primary px-6 py-3" disabled={pending || missing.length > 0}>
-          {pending ? "Salvando..." : mode === "direto" ? "Fazer check-in" : mode === "editar" ? "Salvar alterações" : "Confirmar reserva"}
+          {pending ? tr("Salvando...") : mode === "direto" ? tr("Fazer check-in") : mode === "editar" ? tr("Salvar alterações") : tr("Confirmar reserva")}
         </button>
         {mode === "editar" && (
-          <button type="button" className="btn-secondary" onClick={onDone}>Cancelar</button>
+          <button type="button" className="btn-secondary" onClick={onDone}>{tr("Cancelar")}</button>
         )}
       </div>
     </form>
@@ -412,6 +406,7 @@ export function StayForm({
 }
 
 function GuestSearch({ onPick, onNew }: { onPick: (g: GuestView) => void; onNew: () => void }) {
+  const tr = useT();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<(GuestView & { stays: number })[] | null>(null);
 
@@ -432,12 +427,12 @@ function GuestSearch({ onPick, onNew }: { onPick: (g: GuestView) => void; onNew:
       <div className="flex flex-wrap gap-2">
         <input
           className="field max-w-md flex-1"
-          placeholder="Buscar por nome, CPF ou telefone..."
+          placeholder={tr("Buscar por nome, CPF ou telefone...")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
-        <button type="button" className="btn-secondary" onClick={onNew}>+ Novo hóspede</button>
+        <button type="button" className="btn-secondary" onClick={onNew}>{tr("+ Novo hóspede")}</button>
       </div>
       {shown && (
         <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
@@ -446,12 +441,12 @@ function GuestSearch({ onPick, onNew }: { onPick: (g: GuestView) => void; onNew:
               <button type="button" className="w-full px-3 py-2 text-left hover:bg-blue-50" onClick={() => onPick(g)}>
                 <span className="font-medium">{g.fullName}</span>{" "}
                 <span className="text-xs text-zinc-500">
-                  {[g.docNumber, g.phone].filter(Boolean).join(" · ")} · {g.stays} {g.stays === 1 ? "estadia" : "estadias"}
+                  {[g.docNumber, g.phone].filter(Boolean).join(" · ")} · {g.stays} {g.stays === 1 ? tr("estadia") : tr("estadias")}
                 </span>
               </button>
             </li>
           ))}
-          {shown.length === 0 && <li className="px-3 py-2 text-sm text-zinc-500">Ninguém encontrado. Use “+ Novo hóspede”.</li>}
+          {shown.length === 0 && <li className="px-3 py-2 text-sm text-zinc-500">{tr("Ninguém encontrado. Use “+ Novo hóspede”.")}</li>}
         </ul>
       )}
     </div>

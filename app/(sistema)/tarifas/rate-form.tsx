@@ -7,6 +7,7 @@ import type { RatePlanView } from "@/lib/rates/service";
 import type { FieldErrors } from "@/lib/auth/validation";
 import { saveRatePlanAction } from "./actions";
 
+import { useT } from "@/components/i18n";
 export function RatePlanForm({
   plan,
   types,
@@ -14,6 +15,7 @@ export function RatePlanForm({
   plan?: RatePlanView;
   types: { id: string; name: string; capacity: number }[];
 }) {
+  const tr = useT();
   const [pending, start] = useTransition();
   const [state, setState] = useState<{ error?: string; success?: string; fieldErrors?: FieldErrors }>({});
   const [chargeIss, setChargeIss] = useState(plan?.chargeIss ?? true);
@@ -47,27 +49,22 @@ export function RatePlanForm({
     >
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-48 flex-1">
-          <span className="text-xs text-zinc-500">{plan ? "Nome da tarifa" : "Nova tarifa"}</span>
-          <input name="name" className="field" defaultValue={plan?.name} placeholder="Ex.: Booking, Corporativo" required />
+          <span className="text-xs text-zinc-500">{plan ? tr("Nome da tarifa") : tr("Nova tarifa")}</span>
+          <input name="name" className="field" defaultValue={plan?.name} placeholder={tr("Ex.: Booking, Corporativo")} required />
           <FieldError messages={state.fieldErrors?.name} />
         </label>
         <label className="flex items-center gap-2 pb-2 text-sm">
-          <input type="checkbox" name="includesBreakfast" defaultChecked={plan?.includesBreakfast ?? true} /> Inclui café da manhã
-        </label>
+          <input type="checkbox" name="includesBreakfast" defaultChecked={plan?.includesBreakfast ?? true} />{" "}{tr("Inclui café da manhã")}</label>
         {plan && (
           <label className="flex items-center gap-2 pb-2 text-sm">
-            <input type="checkbox" name="active" defaultChecked={plan.active} /> Ativa
-          </label>
+            <input type="checkbox" name="active" defaultChecked={plan.active} />{" "}{tr("Ativa")}</label>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg bg-zinc-50 p-3 text-sm">
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="chargeIss" checked={chargeIss} onChange={(e) => setChargeIss(e.target.checked)} /> Cobrar ISS sobre a diária
-        </label>
-        <label className={`flex items-center gap-2 ${chargeIss ? "" : "opacity-40"}`}>
-          alíquota
-          <input
+          <input type="checkbox" name="chargeIss" checked={chargeIss} onChange={(e) => setChargeIss(e.target.checked)} />{" "}{tr("Cobrar ISS sobre a diária")}</label>
+        <label className={`flex items-center gap-2 ${chargeIss ? "" : "opacity-40"}`}>{tr("alíquota")}<input
             name="issPercent"
             className="field w-20"
             inputMode="decimal"
@@ -80,13 +77,13 @@ export function RatePlanForm({
       </div>
 
       <div>
-        <div className="mb-2 text-xs text-zinc-500">Diária por tipo de quarto (deixe vazio se este tipo não é vendido nesta tarifa)</div>
+        <div className="mb-2 text-xs text-zinc-500">{tr("Diária por tipo de quarto (deixe vazio se este tipo não é vendido nesta tarifa)")}</div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {types.map((t) => (
             <label key={t.id}>
               <span className="text-xs">{t.name}</span>
               <div className="flex items-center gap-1">
-                <span className="text-sm text-zinc-500">R$</span>
+                <span className="text-sm text-zinc-500">{tr("R$")}</span>
                 <input
                   name={`price_${t.id}`}
                   className="field"
@@ -103,7 +100,7 @@ export function RatePlanForm({
 
       <FormMessage error={state.fieldErrors ? undefined : state.error} success={state.success} />
       <button type="submit" className={plan ? "btn-secondary" : "btn-primary"} disabled={pending}>
-        {pending ? "Salvando..." : plan ? "Salvar tarifa" : "+ Criar tarifa"}
+        {pending ? tr("Salvando...") : plan ? tr("Salvar tarifa") : tr("+ Criar tarifa")}
       </button>
     </form>
   );

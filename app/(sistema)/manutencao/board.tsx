@@ -9,6 +9,7 @@ import type { TicketCard, TicketDetail } from "@/lib/maintenance/service";
 import { ticketActionAction, ticketDetailAction } from "./actions";
 import { NewTicketForm } from "./new-ticket-form";
 
+import { useT } from "@/components/i18n";
 type Perms = { report: boolean; work: boolean; cancel: boolean };
 type Filter = "todas" | "minhas" | "foraDeVenda";
 
@@ -35,6 +36,7 @@ export function MaintenanceBoard({
   initialTicketId: string | null;
   initialNew: { roomId: string } | null;
 }) {
+  const tr = useT();
   const connected = useLiveRefresh(["maintenance.changed", "rooms.changed", "room.updated"]);
   const now = useNow(serverNow);
   const [filter, setFilter] = useState<Filter>("todas");
@@ -54,18 +56,16 @@ export function MaintenanceBoard({
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Manutenção</h1>
+          <h1 className="text-2xl font-bold">{tr("Manutenção")}</h1>
           <LiveDot connected={connected} />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Stat label="Abertas" value={board.open.length} />
-          <Stat label="Urgentes" value={urgent} warn={urgent > 0} />
-          <Stat label="Quartos fora de venda" value={outOfOrder} warn={outOfOrder > 0} />
-          <Stat label="Resolvidas hoje" value={resolvedToday} />
+          <Stat label={tr("Abertas")} value={board.open.length} />
+          <Stat label={tr("Urgentes")} value={urgent} warn={urgent > 0} />
+          <Stat label={tr("Quartos fora de venda")} value={outOfOrder} warn={outOfOrder > 0} />
+          <Stat label={tr("Resolvidas hoje")} value={resolvedToday} />
           {perms.report && (
-            <button type="button" className="btn-primary py-3" onClick={() => setCreating({ roomId: "" })}>
-              + Avisar problema
-            </button>
+            <button type="button" className="btn-primary py-3" onClick={() => setCreating({ roomId: "" })}>{tr("+ Avisar problema")}</button>
           )}
         </div>
       </div>
@@ -85,7 +85,7 @@ export function MaintenanceBoard({
             onClick={() => setFilter(value)}
             className={`rounded-lg px-3 py-1.5 text-sm ${filter === value ? "bg-blue-600 text-white" : "bg-white text-zinc-700 hover:bg-zinc-100"}`}
           >
-            {label}
+            {tr(label)}
           </button>
         ))}
       </div>
@@ -94,19 +94,19 @@ export function MaintenanceBoard({
         {COLUMNS.map((col) => {
           const list = board.open.filter((t) => t.status === col.status && match(t));
           return (
-            <Column key={col.status} title={STATUS_LABEL[col.status]} color={col.color} count={list.length}>
+            <Column key={col.status} title={tr(STATUS_LABEL[col.status])} color={col.color} count={list.length}>
               {list.map((t) => (
                 <Card key={t.id} ticket={t} now={now} onOpen={() => setSelected(t.id)} />
               ))}
             </Column>
           );
         })}
-        <Column title="Encerradas (7 dias)" color="bg-emerald-500" count={board.closed.filter(match).length}>
+        <Column title={tr("Encerradas (7 dias)")} color="bg-emerald-500" count={board.closed.filter(match).length}>
           {board.closed.filter(match).map((t) => (
             <button key={t.id} type="button" onClick={() => setSelected(t.id)} className="card block w-full p-3 text-left text-sm opacity-80 hover:opacity-100">
               <div className="flex justify-between gap-2">
-                <span className="font-semibold">nº {t.number} · {t.place}</span>
-                <span className={t.status === "RESOLVIDA" ? "text-emerald-700" : "text-zinc-500"}>{STATUS_LABEL[t.status]}</span>
+                <span className="font-semibold">{tr("nº {0} ·", [t.number])}{" "}{t.roomNumber ? tr("Quarto {0}", [t.roomNumber]) : t.place}</span>
+                <span className={t.status === "RESOLVIDA" ? "text-emerald-700" : "text-zinc-500"}>{tr(STATUS_LABEL[t.status])}</span>
               </div>
               <div className="truncate text-zinc-600">{t.title}</div>
             </button>
@@ -115,7 +115,7 @@ export function MaintenanceBoard({
       </div>
 
       {creating && (
-        <Drawer title="Avisar problema" onClose={closeCreate}>
+        <Drawer title={tr("Avisar problema")} onClose={closeCreate}>
           <NewTicketForm rooms={rooms} defaultRoomId={creating.roomId} onDone={closeCreate} />
         </Drawer>
       )}
@@ -137,18 +137,19 @@ export function MaintenanceBoard({
 }
 
 function Card({ ticket: t, now, onOpen }: { ticket: TicketCard; now: number; onOpen: () => void }) {
+  const tr = useT();
   return (
     <button type="button" onClick={onOpen} className="card block w-full p-3 text-left transition hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-semibold text-zinc-500">nº {t.number}</span>
+        <span className="text-xs font-semibold text-zinc-500">{tr("nº")}{" "}{t.number}</span>
         <PriorityChip priority={t.priority} />
       </div>
-      <div className="mt-1 text-lg leading-tight font-bold">{t.place}</div>
+      <div className="mt-1 text-lg leading-tight font-bold">{t.roomNumber ? tr("Quarto {0}", [t.roomNumber]) : t.place}</div>
       <div className="text-sm text-zinc-700">{t.title}</div>
-      {t.outOfOrder && <div className="mt-1 inline-block rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">🚫 Fora de venda</div>}
+      {t.outOfOrder && <div className="mt-1 inline-block rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">{tr("🚫 Fora de venda")}</div>}
       <div className="mt-2 flex justify-between text-xs text-zinc-500">
-        <span>{t.assignedToName ?? "Sem responsável"}</span>
-        <span>aberta {since(t.createdAt, now)}</span>
+        <span>{t.assignedToName ?? tr("Sem responsável")}</span>
+        <span>{tr("aberta")}{" "}{since(t.createdAt, now, tr)}</span>
       </div>
     </button>
   );
@@ -169,6 +170,7 @@ function TicketDrawer({
   boardStamp: string;
   onClose: () => void;
 }) {
+  const tr = useT();
   const [ticket, setTicket] = useState<TicketDetail | null | undefined>(undefined);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -195,8 +197,8 @@ function TicketDrawer({
       }
     });
 
-  if (ticket === undefined) return <Drawer title="Carregando..." onClose={onClose}><p className="text-sm text-zinc-500">Carregando...</p></Drawer>;
-  if (ticket === null) return <Drawer title="Ocorrência" onClose={onClose}><p className="text-sm">Ocorrência não encontrada.</p></Drawer>;
+  if (ticket === undefined) return <Drawer title={tr("Carregando...")} onClose={onClose}><p className="text-sm text-zinc-500">{tr("Carregando...")}</p></Drawer>;
+  if (ticket === null) return <Drawer title={tr("Ocorrência")} onClose={onClose}><p className="text-sm">{tr("Ocorrência não encontrada.")}</p></Drawer>;
 
   const open = ["ABERTA", "EM_ANDAMENTO", "AGUARDANDO"].includes(ticket.status);
   const placeholders = {
@@ -207,50 +209,49 @@ function TicketDrawer({
   };
 
   return (
-    <Drawer title={`Ocorrência nº ${ticket.number}`} onClose={onClose}>
+    <Drawer title={tr("Ocorrência nº {0}", [ticket.number])} onClose={onClose}>
       <div className="space-y-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <PriorityChip priority={ticket.priority} />
-            <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-semibold">{STATUS_LABEL[ticket.status]}</span>
-            {ticket.outOfOrder && open && <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">🚫 Fora de venda</span>}
+            <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-semibold">{tr(STATUS_LABEL[ticket.status])}</span>
+            {ticket.outOfOrder && open && <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{tr("🚫 Fora de venda")}</span>}
           </div>
-          <div className="mt-2 text-xl font-bold">{ticket.place}</div>
+          <div className="mt-2 text-xl font-bold">{ticket.roomNumber ? tr("Quarto {0}", [ticket.roomNumber]) : ticket.place}</div>
           <div className="text-zinc-800">{ticket.title}</div>
           {ticket.description && <p className="mt-1 text-sm whitespace-pre-wrap text-zinc-600">{ticket.description}</p>}
-          <div className="mt-2 text-xs text-zinc-500">
-            Aberta por {ticket.reportedByName ?? "Sistema"} em {dateTime(ticket.createdAt)} · Responsável: <b>{ticket.assignedToName ?? "ninguém"}</b>
+          <div className="mt-2 text-xs text-zinc-500">{tr("Aberta por {0} em {1} · Responsável:", [ticket.reportedByName ?? tr("Sistema"), dateTime(ticket.createdAt)])}{" "}<b>{ticket.assignedToName ?? tr("ninguém")}</b>
           </div>
           {ticket.resolution && (
-            <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800"><b>Solução:</b> {ticket.resolution}</p>
+            <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800"><b>{tr("Solução:")}</b> {ticket.resolution}</p>
           )}
         </div>
 
-        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{tr(error)}</p>}
 
         {perms.work && open && (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               {ticket.assignedToId !== me && (
-                <button type="button" className="btn-secondary" disabled={pending} onClick={() => run({ action: "assumir" })}>🙋 Eu resolvo</button>
+                <button type="button" className="btn-secondary" disabled={pending} onClick={() => run({ action: "assumir" })}>{tr("🙋 Eu resolvo")}</button>
               )}
               {canDo("iniciar", ticket.status) && (
-                <button type="button" className="btn bg-blue-600 text-white hover:bg-blue-700" disabled={pending} onClick={() => run({ action: "iniciar" })}>▶ Começar</button>
+                <button type="button" className="btn bg-blue-600 text-white hover:bg-blue-700" disabled={pending} onClick={() => run({ action: "iniciar" })}>{tr("▶ Começar")}</button>
               )}
               {canDo("aguardar", ticket.status) && (
-                <button type="button" className="btn-secondary" disabled={pending} onClick={() => setMode("aguardar")}>⏸ Aguardando</button>
+                <button type="button" className="btn-secondary" disabled={pending} onClick={() => setMode("aguardar")}>{tr("⏸ Aguardando")}</button>
               )}
-              <button type="button" className="btn bg-emerald-600 text-white hover:bg-emerald-700" disabled={pending} onClick={() => setMode("resolver")}>✓ Resolvido</button>
+              <button type="button" className="btn bg-emerald-600 text-white hover:bg-emerald-700" disabled={pending} onClick={() => setMode("resolver")}>{tr("✓ Resolvido")}</button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <select
                 className="field text-sm"
                 value={ticket.assignedToId ?? ""}
                 disabled={pending}
-                aria-label="Responsável"
+                aria-label={tr("Responsável")}
                 onChange={(e) => run({ action: "atribuir", userId: e.target.value || null })}
               >
-                <option value="">Sem responsável</option>
+                <option value="">{tr("Sem responsável")}</option>
                 {staff.map((s) => (
                   <option key={s.id} value={s.id}>{s.fullName}</option>
                 ))}
@@ -259,19 +260,17 @@ function TicketDrawer({
                 className="field text-sm"
                 value={ticket.priority}
                 disabled={pending}
-                aria-label="Prioridade"
+                aria-label={tr("Prioridade")}
                 onChange={(e) => run({ action: "prioridade", value: e.target.value })}
               >
                 {(Object.keys(PRIORITY) as TicketPriority[]).map((p) => (
-                  <option key={p} value={p}>Prioridade {PRIORITY[p].label.toLowerCase()}</option>
+                  <option key={p} value={p}>{tr("Prioridade")}{" "}{tr(PRIORITY[p].label.toLowerCase())}</option>
                 ))}
               </select>
             </div>
             {ticket.roomId && (
               <label className="flex items-center gap-2 rounded-lg bg-red-50 p-2 text-sm">
-                <input type="checkbox" checked={ticket.outOfOrder} disabled={pending} onChange={(e) => run({ action: "foraDeVenda", value: e.target.checked })} />
-                Quarto fora de venda até resolver
-              </label>
+                <input type="checkbox" checked={ticket.outOfOrder} disabled={pending} onChange={(e) => run({ action: "foraDeVenda", value: e.target.checked })} />{tr("Quarto fora de venda até resolver")}</label>
             )}
           </div>
         )}
@@ -286,31 +285,31 @@ function TicketDrawer({
           >
             <textarea className="field" rows={3} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholders[mode]} maxLength={1000} />
             <div className="flex gap-2">
-              <button type="submit" className="btn-primary" disabled={pending}>Confirmar</button>
-              <button type="button" className="btn-secondary" onClick={() => setMode(null)}>Voltar</button>
+              <button type="submit" className="btn-primary" disabled={pending}>{tr("Confirmar")}</button>
+              <button type="button" className="btn-secondary" onClick={() => setMode(null)}>{tr("Voltar")}</button>
             </div>
           </form>
         )}
 
         <div className="flex flex-wrap gap-2 text-sm">
           {!mode && (
-            <button type="button" className="text-blue-700 underline" onClick={() => setMode("comentar")}>💬 Comentar</button>
+            <button type="button" className="text-blue-700 underline" onClick={() => setMode("comentar")}>{tr("💬 Comentar")}</button>
           )}
           {perms.work && !open && (
-            <button type="button" className="text-blue-700 underline" disabled={pending} onClick={() => run({ action: "reabrir" })}>↺ Reabrir</button>
+            <button type="button" className="text-blue-700 underline" disabled={pending} onClick={() => run({ action: "reabrir" })}>{tr("↺ Reabrir")}</button>
           )}
           {perms.cancel && open && !mode && (
-            <button type="button" className="text-red-700 underline" onClick={() => setMode("cancelar")}>Cancelar ocorrência</button>
+            <button type="button" className="text-red-700 underline" onClick={() => setMode("cancelar")}>{tr("Cancelar ocorrência")}</button>
           )}
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Linha do tempo</h3>
+          <h3 className="mb-2 text-sm font-semibold">{tr("Linha do tempo")}</h3>
           <ol className="space-y-2 text-sm">
             {ticket.events.map((e) => (
               <li key={e.id} className="border-l-2 border-zinc-200 pl-3">
                 <div>
-                  <b>{EVENT_LABEL[e.type] ?? e.type}</b>
+                  <b>{tr(EVENT_LABEL[e.type] ?? e.type)}</b>
                   {e.message && <span className="text-zinc-700"> — {e.message}</span>}
                 </div>
                 <div className="text-xs text-zinc-500">{e.userName} · {dateTime(e.createdAt)}</div>
@@ -337,10 +336,12 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 export function PriorityChip({ priority }: { priority: TicketPriority }) {
-  return <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${PRIORITY[priority].chip}`}>{PRIORITY[priority].label}</span>;
+  const tr = useT();
+  return <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${PRIORITY[priority].chip}`}>{tr(PRIORITY[priority].label)}</span>;
 }
 
 function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const tr = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -352,13 +353,13 @@ function Drawer({ title, onClose, children }: { title: string; onClose: () => vo
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={tr(title)}
         className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl md:max-h-none md:w-[28rem] md:rounded-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-lg px-2 py-1 text-xl hover:bg-zinc-100">✕</button>
+          <h2 className="text-lg font-bold">{tr(title)}</h2>
+          <button type="button" onClick={onClose} aria-label={tr("Fechar")} className="rounded-lg px-2 py-1 text-xl hover:bg-zinc-100">✕</button>
         </div>
         {children}
       </div>
@@ -367,24 +368,26 @@ function Drawer({ title, onClose, children }: { title: string; onClose: () => vo
 }
 
 function Column({ title, color, count, children }: { title: string; color: string; count: number; children: React.ReactNode }) {
+  const tr = useT();
   return (
     <section>
       <h2 className="mb-2 flex items-center gap-2 font-semibold">
         <span className={`h-3 w-3 rounded-full ${color}`} />
-        {title} <span className="text-zinc-400">{count}</span>
+        {tr(title)} <span className="text-zinc-400">{count}</span>
       </h2>
       <div className="space-y-2">
         {children}
-        {count === 0 && <p className="rounded-lg border border-dashed border-zinc-300 p-4 text-center text-sm text-zinc-400">Nada aqui.</p>}
+        {count === 0 && <p className="rounded-lg border border-dashed border-zinc-300 p-4 text-center text-sm text-zinc-400">{tr("Nada aqui.")}</p>}
       </div>
     </section>
   );
 }
 
 function Stat({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+  const tr = useT();
   return (
     <div className={`card px-4 py-2 ${warn ? "border-red-200 bg-red-50" : ""}`}>
-      <div className="text-xs text-zinc-500">{label}</div>
+      <div className="text-xs text-zinc-500">{tr(label)}</div>
       <div className="text-lg leading-tight font-bold">{value}</div>
     </div>
   );

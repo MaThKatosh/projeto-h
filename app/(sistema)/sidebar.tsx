@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { useT } from "@/components/i18n";
 export type NavItem = {
   label: string;
   icon: string;
@@ -25,6 +26,7 @@ export function Sidebar({
   roleLabel: string;
   logout: () => Promise<void>;
 }) {
+  const tr = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const operation = items.filter((i) => !i.group);
@@ -35,13 +37,13 @@ export function Sidebar({
       {/* Topo (celular: com botão de menu) */}
       <div className="flex items-center justify-between px-4 py-3 md:py-5">
         <Link href="/mapa" className="flex items-center gap-2" onClick={() => setOpen(false)}>
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-lg font-black">H</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-lg font-black">{tr("H")}</span>
           <span className="truncate font-bold">{hotelName}</span>
         </Link>
         <button
           type="button"
           className="rounded-lg px-3 py-2 text-xl md:hidden"
-          aria-label={open ? "Fechar menu" : "Abrir menu"}
+          aria-label={open ? tr("Fechar menu") : tr("Abrir menu")}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
@@ -58,7 +60,7 @@ export function Sidebar({
 
         {admin.length > 0 && (
           <>
-            <p className="mt-5 mb-1 px-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase">Administração</p>
+            <p className="mt-5 mb-1 px-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase">{tr("Administração")}</p>
             <nav className="space-y-0.5">
               {admin.map((item) => (
                 <NavLink key={item.label} item={item} active={isActive(item.href, pathname)} onNavigate={() => setOpen(false)} />
@@ -74,12 +76,10 @@ export function Sidebar({
             className={`block rounded-lg px-3 py-2 hover:bg-zinc-800 ${pathname === "/perfil" ? "bg-zinc-800" : ""}`}
           >
             <span className="block truncate text-sm font-semibold">{userName}</span>
-            <span className="block text-xs text-zinc-400">{roleLabel} · meu perfil</span>
+            <span className="block text-xs text-zinc-400">{roleLabel}{" "}{tr("· meu perfil")}</span>
           </Link>
           <form action={logout}>
-            <button type="submit" className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white">
-              ⏻ Sair
-            </button>
+            <button type="submit" className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white">{tr("⏻ Sair")}</button>
           </form>
         </div>
       </div>
@@ -92,11 +92,12 @@ function isActive(href: string | undefined, pathname: string) {
 }
 
 function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate: () => void }) {
+  const tr = useT();
   if (!item.href) {
     return (
-      <div className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-500" title={`Chega na ${item.soon}`}>
+      <div className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-500" title={tr("Chega na {0}", [item.soon])}>
         <span className="w-5 text-center opacity-60">{item.icon}</span>
-        <span className="flex-1">{item.label}</span>
+        <span className="flex-1">{tr(item.label)}</span>
         <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{item.soon}</span>
       </div>
     );
@@ -110,7 +111,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
       }`}
     >
       <span className="w-5 text-center">{item.icon}</span>
-      {item.label}
+      {tr(item.label)}
     </Link>
   );
 }
