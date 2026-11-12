@@ -312,6 +312,13 @@ model Guest {
   nationality String?
   city        String?
   state       String?
+  // Ficha Nacional de Registro de Hóspedes (FNRH)
+  gender      String?   // M | F | OUTRO
+  profession  String?
+  docIssuer   String?   // órgão emissor / país do passaporte
+  address     String?
+  zipCode     String?
+  country     String?
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -390,6 +397,11 @@ model Reservation {
   issBasisPoints Int               @default(0)
   source         ReservationSource @default(BALCAO)
   externalCode   String?           // nº da reserva no portal
+  // Dados da viagem para a FNRH (preenchidos no check-in).
+  travelPurpose   String?
+  transport       String?
+  arrivingFrom    String?
+  nextDestination String?
   notes          String?
   cancelReason   String?
   createdById    String?           @db.Uuid

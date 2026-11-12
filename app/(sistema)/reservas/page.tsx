@@ -51,6 +51,7 @@ export default async function ReservasPage({
           </div>
           {can(user.role, "reservations.manage") && (
             <>
+              <Link href="/reservas/importar" className="btn-secondary">{tr("⇪ Importar do portal")}</Link>
               <Link href="/reservas/nova?direto=1" className="btn-secondary">{tr("🛎 Entrada direta")}</Link>
               <Link href="/reservas/nova" className="btn-primary">{tr("+ Nova reserva")}</Link>
             </>

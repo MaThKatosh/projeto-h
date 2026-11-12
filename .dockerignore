@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+deploy/.env
+deploy/backups
+app/generated
+tsconfig.tsbuildinfo
+apps/*/node_modules
+apps/*/src-tauri/target
+apps/mobile/android
+apps/mobile/ios

@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   // arquivo de log (.next/dev/logs) disparava recompilação → recarga da
   // página → novo log, num ciclo sem fim.
   logging: { browserToTerminal: false },
+  // O servidor MCP do Next grava o console do navegador em
+  // .next/dev/logs/next-development.log — mesmo ciclo de recarga.
+  experimental: { mcpServer: false },
   async headers() {
     return [
       {

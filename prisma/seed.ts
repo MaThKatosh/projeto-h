@@ -15,18 +15,24 @@ async function main() {
 
   const username = (process.env.SEED_ADMIN_USERNAME || "admin").trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!password || password.length < 8) {
-    throw new Error("Defina SEED_ADMIN_PASSWORD (mín. 8 caracteres) no .env.");
-  }
 
   const admin = await db.user.findUnique({ where: { username } });
   if (admin) {
     console.log(`Administrador "${username}" já existe (senha não alterada).`);
   } else {
+    if (!password || password.length < 8) {
+      throw new Error("Defina SEED_ADMIN_PASSWORD (mín. 8 caracteres) no .env.");
+    }
     await db.user.create({
       data: { username, fullName: "Administrador", role: "ADMIN", passwordHash: await hashPassword(password) },
     });
     console.log(`Administrador "${username}" criado. A senha está no .env (SEED_ADMIN_PASSWORD).`);
+  }
+
+  // Instalação de verdade (SEED_EXAMPLE=0): o hotel cadastra os próprios quartos.
+  if (process.env.SEED_EXAMPLE === "0") {
+    console.log("Hotel de exemplo desligado (SEED_EXAMPLE=0).");
+    return;
   }
 
   if ((await db.room.count()) > 0) {

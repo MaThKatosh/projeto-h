@@ -3,6 +3,7 @@
 import { FieldError } from "@/components/field-error";
 import type { FieldErrors } from "@/lib/auth/validation";
 import type { GuestView } from "@/lib/guests/service";
+import { GENDERS, GENDER_LABEL, PURPOSE_LABEL, TRANSPORT_LABEL, TRANSPORTS, TRAVEL_PURPOSES, type TripInput } from "@/lib/guests/fnrh";
 
 import { useT } from "@/components/i18n";
 // Campos do hóspede (não controlados). Lidos com readGuest(form, prefixo).
@@ -70,6 +71,33 @@ export function GuestFields({
             <span className="text-xs text-zinc-500">{tr("Estado")}</span>
             <input name={n("state")} className="field" defaultValue={initial?.state ?? ""} maxLength={30} />
           </label>
+          <label>
+            <span className="text-xs text-zinc-500">{tr("Sexo")}</span>
+            <select name={n("gender")} className="field" defaultValue={initial?.gender ?? ""}>
+              <option value="">—</option>
+              {GENDERS.map((g) => <option key={g} value={g}>{tr(GENDER_LABEL[g])}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="text-xs text-zinc-500">{tr("Profissão")}</span>
+            <input name={n("profession")} className="field" defaultValue={initial?.profession ?? ""} maxLength={60} />
+          </label>
+          <label>
+            <span className="text-xs text-zinc-500">{tr("Órgão emissor / país do documento")}</span>
+            <input name={n("docIssuer")} className="field" defaultValue={initial?.docIssuer ?? ""} maxLength={40} />
+          </label>
+          <label>
+            <span className="text-xs text-zinc-500">{tr("País de residência")}</span>
+            <input name={n("country")} className="field" defaultValue={initial?.country ?? "Brasil"} maxLength={40} />
+          </label>
+          <label className="sm:col-span-2 lg:col-span-3">
+            <span className="text-xs text-zinc-500">{tr("Endereço (rua, número, bairro)")}</span>
+            <input name={n("address")} className="field" defaultValue={initial?.address ?? ""} maxLength={160} />
+          </label>
+          <label>
+            <span className="text-xs text-zinc-500">{tr("CEP")}</span>
+            <input name={n("zipCode")} className="field" inputMode="numeric" defaultValue={initial?.zipCode ?? ""} maxLength={12} />
+          </label>
         </>
       )}
     </div>
@@ -89,7 +117,56 @@ export function readGuest(form: HTMLFormElement, prefix = "g_") {
     nationality: get("nationality"),
     city: get("city"),
     state: get("state"),
+    // Campos da FNRH só existem no formulário completo.
+    ...(f.has(`${prefix}gender`)
+      ? {
+          gender: get("gender"),
+          profession: get("profession"),
+          docIssuer: get("docIssuer"),
+          country: get("country"),
+          address: get("address"),
+          zipCode: get("zipCode"),
+        }
+      : {}),
   };
+}
+
+// Dados da viagem pedidos pela FNRH (por estadia).
+export function TripFields({ initial, prefix = "t_" }: { initial?: Partial<TripInput>; prefix?: string }) {
+  const tr = useT();
+  const n = (k: string) => `${prefix}${k}`;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label>
+        <span className="text-xs text-zinc-500">{tr("Motivo da viagem")}</span>
+        <select name={n("travelPurpose")} className="field" defaultValue={initial?.travelPurpose ?? ""}>
+          <option value="">—</option>
+          {TRAVEL_PURPOSES.map((p) => <option key={p} value={p}>{tr(PURPOSE_LABEL[p])}</option>)}
+        </select>
+      </label>
+      <label>
+        <span className="text-xs text-zinc-500">{tr("Meio de transporte")}</span>
+        <select name={n("transport")} className="field" defaultValue={initial?.transport ?? ""}>
+          <option value="">—</option>
+          {TRANSPORTS.map((p) => <option key={p} value={p}>{tr(TRANSPORT_LABEL[p])}</option>)}
+        </select>
+      </label>
+      <label>
+        <span className="text-xs text-zinc-500">{tr("Vem de (cidade/UF/país)")}</span>
+        <input name={n("arrivingFrom")} className="field" defaultValue={initial?.arrivingFrom ?? ""} maxLength={80} />
+      </label>
+      <label>
+        <span className="text-xs text-zinc-500">{tr("Próximo destino")}</span>
+        <input name={n("nextDestination")} className="field" defaultValue={initial?.nextDestination ?? ""} maxLength={80} />
+      </label>
+    </div>
+  );
+}
+
+export function readTrip(form: HTMLFormElement, prefix = "t_") {
+  const f = new FormData(form);
+  const get = (k: string) => String(f.get(`${prefix}${k}`) ?? "");
+  return { travelPurpose: get("travelPurpose"), transport: get("transport"), arrivingFrom: get("arrivingFrom"), nextDestination: get("nextDestination") };
 }
 
 export function VehicleFields({ prefix = "v_", errors }: { prefix?: string; errors?: FieldErrors }) {

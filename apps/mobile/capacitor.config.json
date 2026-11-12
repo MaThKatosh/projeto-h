@@ -1,0 +1,12 @@
+{
+  "appId": "br.com.projetoh.hotel",
+  "appName": "Sistema do Hotel",
+  "webDir": "../conectar",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -2,6 +2,7 @@ import { addDays, fromDateStr, nightsBetween, toDateStr } from "@/lib/dates";
 import { CATEGORY_LABEL, METHOD, type Category, type Method } from "@/lib/folio/rules";
 import { SOURCE_LABEL, type Source } from "@/lib/reservations/rules";
 import { ROLE_LABEL } from "@/lib/permissions";
+import { GENDER_LABEL, PURPOSE_LABEL, TRANSPORT_LABEL, missingFnrh } from "@/lib/guests/fnrh";
 import { localDayStr, localStart, type ReportDef, type ReportParams } from "@/lib/reports/engine";
 
 // ================================================================
@@ -159,6 +160,98 @@ export const REPORTS: ReportDef[] = [
           diaria: r.dailyCents,
           reserva: r.number,
         })),
+      };
+    },
+  },
+  {
+    slug: "fnrh",
+    title: "Fichas de hóspedes (FNRH)",
+    description: "Uma linha por pessoa que fez check-in no período, com os dados da Ficha Nacional de Registro de Hóspedes. Baixe em Excel para conferir ou enviar.",
+    group: "Recepção",
+    roles: [...ALL_FRONT],
+    period: "range",
+    defaultPeriod: "today",
+    async run(db, p) {
+      const guestSel = { fullName: true, docType: true, docNumber: true, docIssuer: true, birthDate: true, gender: true, nationality: true, profession: true, phone: true, email: true, address: true, city: true, state: true, zipCode: true, country: true } as const;
+      const rows = await db.reservation.findMany({
+        where: { checkedInAt: byTimestamp(p) },
+        orderBy: { checkedInAt: "asc" },
+        select: {
+          number: true,
+          checkIn: true,
+          checkOut: true,
+          travelPurpose: true,
+          transport: true,
+          arrivingFrom: true,
+          nextDestination: true,
+          room: { select: { number: true } },
+          guest: { select: guestSel },
+          companions: { select: { guest: { select: guestSel } } },
+        },
+      });
+      let incomplete = 0;
+      const data = rows.flatMap((r) =>
+        [{ g: r.guest, papel: "titular" }, ...r.companions.map((c) => ({ g: c.guest, papel: "acompanhante" }))].map(({ g, papel }) => {
+          const missing = missingFnrh({ ...g, birthDate: g.birthDate ? toDateStr(g.birthDate) : null });
+          if (missing.length) incomplete++;
+          return {
+            reserva: r.number,
+            quarto: r.room?.number ?? "",
+            papel,
+            nome: g.fullName,
+            nascimento: g.birthDate ? toDateStr(g.birthDate) : null,
+            sexo: g.gender ? GENDER_LABEL[g.gender] ?? g.gender : null,
+            nacionalidade: g.nationality,
+            documento: [g.docType, g.docNumber].filter(Boolean).join(" ") || null,
+            emissor: g.docIssuer,
+            profissao: g.profession,
+            telefone: g.phone,
+            email: g.email,
+            endereco: g.address,
+            cidade: [g.city, g.state].filter(Boolean).join("/") || null,
+            cep: g.zipCode,
+            pais: g.country,
+            motivo: r.travelPurpose ? PURPOSE_LABEL[r.travelPurpose] ?? r.travelPurpose : null,
+            transporte: r.transport ? TRANSPORT_LABEL[r.transport] ?? r.transport : null,
+            procedencia: r.arrivingFrom,
+            destino: r.nextDestination,
+            entrada: toDateStr(r.checkIn),
+            saida: toDateStr(r.checkOut),
+            falta: missing.join(", ") || null,
+          };
+        })
+      );
+      return {
+        columns: [
+          { key: "reserva", label: "Reserva" },
+          { key: "quarto", label: "Quarto" },
+          { key: "papel", label: "Tipo" },
+          { key: "nome", label: "Nome completo" },
+          { key: "nascimento", label: "Nascimento", type: "date" },
+          { key: "sexo", label: "Sexo" },
+          { key: "nacionalidade", label: "Nacionalidade" },
+          { key: "documento", label: "Documento" },
+          { key: "emissor", label: "Órgão emissor" },
+          { key: "profissao", label: "Profissão" },
+          { key: "telefone", label: "Telefone" },
+          { key: "email", label: "E-mail" },
+          { key: "endereco", label: "Endereço" },
+          { key: "cidade", label: "Cidade" },
+          { key: "cep", label: "CEP" },
+          { key: "pais", label: "País" },
+          { key: "motivo", label: "Motivo da viagem" },
+          { key: "transporte", label: "Meio de transporte" },
+          { key: "procedencia", label: "Vem de" },
+          { key: "destino", label: "Próximo destino" },
+          { key: "entrada", label: "Entrada", type: "date" },
+          { key: "saida", label: "Saída", type: "date" },
+          { key: "falta", label: "Falta preencher" },
+        ],
+        rows: data,
+        summary: [
+          { label: "Pessoas registradas", value: String(data.length) },
+          { label: "Fichas incompletas", value: String(incomplete) },
+        ],
       };
     },
   },

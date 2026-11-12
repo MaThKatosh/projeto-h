@@ -5,7 +5,17 @@ reservas, restaurante, frigobar, financeiro e auditoria num só lugar.
 
 **Tecnologias:** Next.js 16 · React 19 · Prisma 7 · PostgreSQL 17 (Docker) · Tailwind 4.
 
-## Como rodar (primeira vez)
+## Instalar no hotel (uso de verdade)
+
+Um comando instala tudo (sistema, banco, HTTPS e backup diário), num computador do
+hotel ou na nuvem — passo a passo em **[docs/INSTALACAO.md](docs/INSTALACAO.md)**:
+
+```
+powershell -ExecutionPolicy Bypass -File deployinstalar.ps1   # Windows
+bash deploy/instalar.sh                                     # Linux / Mac
+```
+
+## Como rodar para desenvolver (primeira vez)
 
 ```bash
 npm install
@@ -55,8 +65,20 @@ app/(sistema)       telas internas (menu lateral)
   relatorios/       relatórios (tela, impressão e CSV)
   quartos/          cadastro de tipos e quartos
   usuarios/         usuários e cargos
-  perfil/           trocar a própria senha
+  perfil/           trocar a própria senha e o idioma
+  configuracoes/    dados do hotel, pagamentos, bandeiras, channel manager
+  reservas/importar importar reservas dos portais (CSV)
+  reservas/[id]/fnrh ficha FNRH para imprimir
 app/api/eventos     canal de avisos em tempo real
+app/api/integracoes API do channel manager (reservas e vagas)
+app/api/saude       verificação de saúde (instalação)
+app/manifest.ts     app instalável (com public/sw.js e public/offline.html)
+lib/integrations/   leitura dos arquivos dos portais e gravação das reservas de fora
+lib/guests/fnrh.ts  campos e listas da FNRH
+lib/i18n/           idiomas (PT/EN/ES): tr("texto"), tabelas em messages/
+deploy/             instalação: Docker, Caddy (HTTPS), backup, instaladores
+apps/               apps nativos: conectar/ (tela inicial), desktop/ (Tauri), mobile/ (Capacitor)
+.github/workflows/  montagem dos instaladores dos apps na nuvem do GitHub
 lib/permissions.ts  cargos, hierarquia e o que cada um pode fazer
 lib/rooms/          cores do mapa, regras de mudança, serviço de quartos
 lib/housekeeping/   tarefas de limpeza
@@ -82,4 +104,4 @@ docs/               uma página por fase
 - [x] **Fase 5** — restaurante (salão, comandas, cozinha), frigobar e cardápio, lançando na conta do quarto ([docs/FASE-5.md](docs/FASE-5.md))
 - [x] **Fase 6** — auditoria noturna (lança diárias, guarda os números do dia, vira a data) e 17 relatórios com impressão e Excel ([docs/FASE-6.md](docs/FASE-6.md))
 - [x] **Extra** — tela de Configurações, bandeiras de cartão, botões de desfazer (auditoria, check-in, check-out, cancelamento) e idiomas PT/EN/ES ([docs/CONFIGURACOES.md](docs/CONFIGURACOES.md))
-- [ ] Fase 7 — apps instalados (Windows, Mac, Linux, celular) e integração com portais
+- [x] **Fase 7** — instalação com HTTPS (PC do hotel ou nuvem) e backup diário, app instalável + apps nativos, importação de reservas dos portais e API para channel manager, ficha FNRH ([docs/FASE-7.md](docs/FASE-7.md))

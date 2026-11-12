@@ -1,0 +1,4 @@
+# Scripts e configs que rodam em Linux (containers): sempre com quebra de linha LF.
+*.sh text eol=lf
+deploy/caddy/* text eol=lf
+deploy/Dockerfile text eol=lf

@@ -17,6 +17,12 @@ export type GuestView = {
   nationality: string | null;
   city: string | null;
   state: string | null;
+  gender: string | null;
+  profession: string | null;
+  docIssuer: string | null;
+  address: string | null;
+  zipCode: string | null;
+  country: string | null;
   notes: string | null;
 };
 
@@ -31,6 +37,12 @@ export const guestSelect = {
   nationality: true,
   city: true,
   state: true,
+  gender: true,
+  profession: true,
+  docIssuer: true,
+  address: true,
+  zipCode: true,
+  country: true,
   notes: true,
 } as const;
 
@@ -45,6 +57,12 @@ export function toGuestView(g: {
   nationality: string | null;
   city: string | null;
   state: string | null;
+  gender: string | null;
+  profession: string | null;
+  docIssuer: string | null;
+  address: string | null;
+  zipCode: string | null;
+  country: string | null;
   notes: string | null;
 }): GuestView {
   return { ...g, birthDate: g.birthDate ? toDateStr(g.birthDate) : null };
@@ -66,6 +84,12 @@ export function guestData(input: GuestInput) {
     nationality: input.nationality,
     city: input.city,
     state: input.state,
+    gender: input.gender,
+    profession: input.profession,
+    docIssuer: input.docIssuer,
+    address: input.address,
+    zipCode: input.zipCode,
+    country: input.country,
     notes: input.notes,
   };
 }

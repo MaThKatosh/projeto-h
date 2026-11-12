@@ -18,5 +18,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Páginas apenas; as APIs verificam a sessão por conta própria.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
+  // Também livres: manifesto, service worker e página offline do app instalável.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|ico)$).*)"],
 };

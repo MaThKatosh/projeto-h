@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sistema do Hotel</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: linear-gradient(135deg, #1d4ed8, #312e81); color: #18181b; padding: 16px; }
+  .box { width: 100%; max-width: 400px; padding: 28px; background: #fff; border-radius: 18px; box-shadow: 0 20px 40px rgba(0,0,0,.25); }
+  .logo { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 16px; background: #2563eb; color: #fff; font: 900 28px/56px Arial, sans-serif; text-align: center; }
+  h1 { margin: 0 0 4px; font-size: 20px; text-align: center; }
+  p { margin: 0 0 16px; color: #71717a; font-size: 14px; text-align: center; }
+  label { font-size: 12px; color: #71717a; }
+  input { width: 100%; margin: 4px 0 12px; padding: 12px; border: 1px solid #d4d4d8; border-radius: 10px; font-size: 16px; }
+  button { width: 100%; padding: 12px; border: 0; border-radius: 10px; background: #2563eb; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+  button.link { background: none; color: #2563eb; font-size: 14px; font-weight: 500; margin-top: 8px; }
+  .err { display: none; margin-bottom: 12px; padding: 10px; border-radius: 10px; background: #fef2f2; color: #b91c1c; font-size: 14px; }
+  .hint { font-size: 12px; color: #a1a1aa; margin-top: 12px; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">H</div>
+    <div id="connecting" style="display:none">
+      <h1>Conectando…</h1>
+      <p id="target"></p>
+      <button class="link" id="change">Trocar servidor</button>
+    </div>
+    <form id="form" style="display:none">
+      <h1>Conectar ao servidor</h1>
+      <p>Endereço que a gerência passou (o mesmo usado no navegador).</p>
+      <div class="err" id="err"></div>
+      <label for="url">Endereço do servidor</label>
+      <input id="url" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://192.168.0.10  ou  https://sistema.meuhotel.com.br" required>
+      <button type="submit" id="go">Conectar</button>
+      <div class="hint">Server address · Dirección del servidor</div>
+    </form>
+  </div>
+<script>
+  // App de computador/celular: só guarda o endereço do servidor e abre o
+  // sistema. Nenhum dado do hotel fica no aparelho.
+  const KEY = "hotel.server";
+  const $ = (id) => document.getElementById(id);
+
+  function normalize(raw) {
+    let s = raw.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+    return new URL(s).origin;
+  }
+
+  // Testa se o servidor responde (sem CORS: só interessa se a conexão abre).
+  async function reachable(origin) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      await fetch(origin + "/api/saude", { mode: "no-cors", cache: "no-store", signal: ctrl.signal });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function showForm(message, value) {
+    $("connecting").style.display = "none";
+    $("form").style.display = "block";
+    $("url").value = value || localStorage.getItem(KEY) || "";
+    $("err").style.display = message ? "block" : "none";
+    $("err").textContent = message || "";
+    $("url").focus();
+  }
+
+  async function open(origin, fromForm) {
+    $("go").disabled = true;
+    if (await reachable(origin)) {
+      localStorage.setItem(KEY, origin);
+      location.replace(origin + "/mapa");
+      return;
+    }
+    $("go").disabled = false;
+    showForm(
+      fromForm
+        ? "Não consegui abrir " + origin + ". Confira o endereço, a rede e se o certificado do servidor foi instalado neste aparelho."
+        : "O servidor " + origin + " não respondeu. Confira a rede ou troque o endereço.",
+      origin
+    );
+  }
+
+  $("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    let origin;
+    try { origin = normalize($("url").value); } catch { return showForm("Endereço inválido.", $("url").value); }
+    open(origin, true);
+  });
+
+  let auto;
+  $("change").addEventListener("click", () => { clearTimeout(auto); showForm(); });
+
+  const saved = localStorage.getItem(KEY);
+  if (saved) {
+    // 2 segundos para dar tempo de tocar em "Trocar servidor".
+    $("connecting").style.display = "block";
+    $("target").textContent = saved;
+    auto = setTimeout(() => open(saved, false), 2000);
+  } else {
+    showForm();
+  }
+</script>
+</body>
+</html>

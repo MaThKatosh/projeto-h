@@ -1,0 +1,88 @@
+# Instalação do Projeto H no servidor (PC do hotel ou nuvem).
+# Use os scripts instalar.ps1 (Windows) ou instalar.sh (Linux/Mac): eles
+# criam o deploy/.env com senhas aleatórias e sobem tudo.
+#
+#   app     — o sistema
+#   db      — banco de dados (não fica exposto na rede)
+#   caddy   — HTTPS: certificado próprio na rede do hotel, ou Let's Encrypt na nuvem
+#   backup  — cópia do banco todo dia em deploy/backups (guarda 30 dias)
+
+name: hotel
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hotel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?rode o instalador (falta deploy/.env)}
+      POSTGRES_DB: hotel
+      TZ: America/Sao_Paulo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel -d hotel"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://hotel:${POSTGRES_PASSWORD}@db:5432/hotel?schema=public
+      SEED_ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SEED_EXAMPLE: "0"
+      COOKIE_SECURE: "1"
+      TZ: America/Sao_Paulo
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SERVER_ADDRESS: ${SERVER_ADDRESS:-localhost}
+      DOMAIN: ${DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./caddy/${MODE:-local}.Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          f=/backups/hotel-$$(date +%Y-%m-%d_%H%M).dump
+          if pg_dump -h db -U hotel -d hotel -Fc -f "$$f"; then echo "[backup] ok $$f"; else echo "[backup] FALHOU"; rm -f "$$f"; fi
+          find /backups -name 'hotel-*.dump' -mtime +30 -delete
+          sleep 86400
+        done
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

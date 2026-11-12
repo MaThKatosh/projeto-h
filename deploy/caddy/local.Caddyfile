@@ -1,0 +1,28 @@
+# Rede interna do hotel: HTTPS com certificado próprio (sem internet).
+# Cada aparelho instala UMA vez o certificado do servidor, baixado em
+# http://ENDEREÇO-DO-SERVIDOR/certificado.crt (veja docs/INSTALACAO.md).
+{
+	local_certs
+	skip_install_trust
+}
+
+http://{$SERVER_ADDRESS}, http://localhost {
+	handle /certificado.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+	handle {
+		redir https://{host}{uri}
+	}
+}
+
+https://{$SERVER_ADDRESS}, https://localhost {
+	tls internal
+	encode gzip
+	reverse_proxy app:3000 {
+		# avisos ao vivo (mapa, cozinha...) chegam na hora
+		flush_interval -1
+	}
+}

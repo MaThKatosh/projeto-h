@@ -4,7 +4,10 @@ import { requirePermission } from "@/lib/auth/dal";
 import { getHotelSettings, getParkingDailyCents, listCardBrands } from "@/lib/settings";
 import { getServiceFeeBp } from "@/lib/restaurant/service";
 import { formatBRL } from "@/lib/money";
+import { headers } from "next/headers";
+import { tokenInfo } from "@/lib/integrations/service";
 import { BrandRow, HotelForm } from "./forms";
+import { IntegrationSection } from "./integration";
 
 import { getT } from "@/lib/i18n/server";
 export const dynamic = "force-dynamic";
@@ -13,7 +16,7 @@ export default async function ConfiguracoesPage() {
   const tr = await getT();
   await requirePermission("settings.manage");
   const db = getDb();
-  const [settings, brands, rooms, types, plans, menu, tables, users, parking, fee, lastRun] = await Promise.all([
+  const [settings, brands, rooms, types, plans, menu, tables, users, parking, fee, lastRun, token, h] = await Promise.all([
     getHotelSettings(db),
     listCardBrands(db),
     db.room.count({ where: { active: true } }),
@@ -25,7 +28,11 @@ export default async function ConfiguracoesPage() {
     getParkingDailyCents(db),
     getServiceFeeBp(db),
     db.auditRun.findFirst({ where: { undoneAt: null }, orderBy: { businessDate: "desc" }, select: { businessDate: true } }),
+    tokenInfo(db),
+    headers(),
   ]);
+  // Endereço como o navegador vê o sistema (rede do hotel ou domínio na nuvem).
+  const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"}`;
   const count = (o: string) => menu.find((m) => m.outlet === o)?._count ?? 0;
 
   const shortcuts = [
@@ -76,6 +83,8 @@ export default async function ConfiguracoesPage() {
         ))}
         <BrandRow />
       </section>
+
+      <IntegrationSection info={token} origin={origin} />
     </div>
   );
 }

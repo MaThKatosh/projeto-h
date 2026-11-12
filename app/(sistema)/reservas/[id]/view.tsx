@@ -13,7 +13,8 @@ import { formatDate, nightsBetween, weekday, type DateStr } from "@/lib/dates";
 import { formatBRL, formatPercent } from "@/lib/money";
 import { SOURCE_LABEL, STATUS } from "@/lib/reservations/rules";
 import { effectiveCheckOut } from "@/lib/folio/rules";
-import { GuestFields, readGuest, readVehicle, VehicleFields } from "../guest-fields";
+import { GuestFields, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "../guest-fields";
+import { missingFnrh, PURPOSE_LABEL, TRANSPORT_LABEL } from "@/lib/guests/fnrh";
 import { StayForm } from "../stay-form";
 import type { FolioView } from "@/lib/folio/service";
 import { Balance, Folio, PaymentForm } from "./folio";
@@ -33,7 +34,7 @@ import {
   postNightsAction,
   readyRoomsAction,
   removeCompanionAction,
-  updateGuestAction,
+  updateGuestAndTripAction,
   vehicleExitAction,
   type ActionResult,
 } from "../actions";
@@ -57,6 +58,7 @@ const EVENT_LABEL: Record<string, string> = {
   estorno: "Estorno",
   desfeito: "Desfeito",
   reativada: "Reserva reativada",
+  portal: "Portal",
 };
 
 export function ReservationView({
@@ -236,6 +238,17 @@ export function ReservationView({
                 {[r.guest.docType && r.guest.docNumber ? `${r.guest.docType} ${r.guest.docNumber}` : tr("sem documento"), r.guest.phone, r.guest.email].filter(Boolean).join(" · ")}
               </div>
               {(r.guest.city || r.guest.state) && <div className="text-zinc-500">{[r.guest.city, r.guest.state].filter(Boolean).join(" / ")}</div>}
+              {(r.trip.travelPurpose || r.trip.transport || r.trip.arrivingFrom) && (
+                <div className="text-zinc-500">
+                  {[r.trip.travelPurpose && tr(PURPOSE_LABEL[r.trip.travelPurpose]), r.trip.transport && tr(TRANSPORT_LABEL[r.trip.transport]), r.trip.arrivingFrom && tr("vem de {0}", [r.trip.arrivingFrom]), r.trip.nextDestination && tr("vai para {0}", [r.trip.nextDestination])].filter(Boolean).join(" · ")}
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a href={`/reservas/${r.id}/fnrh`} target="_blank" className="rounded-lg border border-zinc-300 px-2 py-1 text-xs font-semibold hover:bg-zinc-50">{tr("🖨 Ficha FNRH")}</a>
+                {missingFnrh(r.guest).length > 0 && (
+                  <span className="text-xs text-amber-700">{tr("Ficha incompleta: {0}", [missingFnrh(r.guest).map((m) => tr(m)).join(", ")])}</span>
+                )}
+              </div>
             </div>
           )}
 
@@ -369,7 +382,7 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
           e.preventDefault();
           const form = formRef.current!;
           run(
-            () => checkInAction(r.id, { roomId: effectiveRoom, guest: readGuest(form), vehicle: readVehicle(form) }),
+            () => checkInAction(r.id, { roomId: effectiveRoom, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form) }),
             () => onDone("Check-in feito. Bem-vindo!")
           );
         }}
@@ -389,7 +402,11 @@ function CheckInPanel({ r, today, onClose, onDone }: PanelProps & { today: DateS
           <GuestFields initial={r.guest} errors={state.fieldErrors} requireDoc />
         </div>
         <div>
-          <h3 className="mb-2 text-sm font-semibold">{tr("3. Veículo (opcional)")}</h3>
+          <h3 className="mb-2 text-sm font-semibold">{tr("3. Viagem (ficha FNRH)")}</h3>
+          <TripFields initial={r.trip} />
+        </div>
+        <div>
+          <h3 className="mb-2 text-sm font-semibold">{tr("4. Veículo (opcional)")}</h3>
           <VehicleFields errors={state.fieldErrors} />
         </div>
         <FormMessage error={state.error} />
@@ -582,10 +599,12 @@ function GuestEdit({ r, onClose, onDone }: PanelProps) {
       className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
-        run(() => updateGuestAction(r.guest.id, readGuest(formRef.current!)), () => onDone("Dados do hóspede salvos."));
+        run(() => updateGuestAndTripAction(r.id, r.guest.id, readGuest(formRef.current!), readTrip(formRef.current!)), () => onDone("Dados do hóspede salvos."));
       }}
     >
       <GuestFields initial={r.guest} errors={state.fieldErrors} />
+      <h3 className="pt-2 text-sm font-semibold">{tr("Viagem (ficha FNRH)")}</h3>
+      <TripFields initial={r.trip} />
       <FormMessage error={state.fieldErrors ? undefined : state.error} />
       <div className="flex gap-2">
         <button className="btn-primary" disabled={pending}>{tr("Salvar")}</button>

@@ -55,6 +55,15 @@ export async function updateGuestAction(guestId: string, input: unknown) {
   return run((db, u) => svc.updateGuest(db, u, guestId, input));
 }
 
+// Ficha do hóspede + dados da viagem, juntos.
+export async function updateGuestAndTripAction(reservationId: string, guestId: string, guest: unknown, trip: unknown) {
+  return run(async (db, u) => {
+    const a = await svc.updateGuest(db, u, guestId, guest);
+    if (!a.ok) return a;
+    return svc.updateTrip(db, u, reservationId, trip);
+  });
+}
+
 export async function addCompanionAction(reservationId: string, input: unknown) {
   return run((db, u) => svc.addCompanion(db, u, reservationId, input));
 }

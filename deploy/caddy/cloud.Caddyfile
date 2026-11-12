@@ -1,0 +1,12 @@
+# Nuvem: HTTPS com certificado gratuito (Let's Encrypt), renovado sozinho.
+# O domínio (ex.: sistema.meuhotel.com.br) precisa apontar para este servidor.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000 {
+		flush_interval -1
+	}
+}

@@ -9,6 +9,7 @@ import { formatBRL } from "@/lib/money";
 import { getBusinessDate } from "@/lib/hotel-date";
 import { applyRoomChanges, type RoomView } from "@/lib/rooms/service";
 import { guestData, guestSelect, toGuestView, type GuestView } from "@/lib/guests/service";
+import { tripSchema, type TripInput } from "@/lib/guests/fnrh";
 import { checkoutBlocker } from "@/lib/folio/service";
 import { effectiveCheckOut, folioTotals } from "@/lib/folio/rules";
 import {
@@ -267,6 +268,7 @@ export type ReservationDetail = ReservationRow & {
   checkedInAt: string | null;
   checkedOutAt: string | null;
   createdByName: string | null;
+  trip: TripInput;
   guest: GuestView;
   companions: GuestView[];
   vehicleList: { id: string; plate: string; model: string | null; color: string | null; spot: string | null; enteredAt: string; exitedAt: string | null }[];
@@ -290,6 +292,10 @@ export async function getReservation(db: Db, id: string): Promise<ReservationDet
       checkedInAt: true,
       checkedOutAt: true,
       createdBy: { select: { fullName: true } },
+      travelPurpose: true,
+      transport: true,
+      arrivingFrom: true,
+      nextDestination: true,
       guest: { select: guestSelect },
       companions: { select: { guest: { select: guestSelect } } },
       vehicles: { orderBy: { enteredAt: "asc" }, select: { id: true, plate: true, model: true, color: true, spot: true, enteredAt: true, exitedAt: true } },
@@ -311,6 +317,7 @@ export async function getReservation(db: Db, id: string): Promise<ReservationDet
     checkedInAt: r.checkedInAt?.toISOString() ?? null,
     checkedOutAt: r.checkedOutAt?.toISOString() ?? null,
     createdByName: r.createdBy?.fullName ?? null,
+    trip: { travelPurpose: r.travelPurpose, transport: r.transport, arrivingFrom: r.arrivingFrom, nextDestination: r.nextDestination } as TripInput,
     guest: toGuestView(r.guest),
     companions: r.companions.map((c) => toGuestView(c.guest)),
     vehicleList: r.vehicles.map((v) => ({ ...v, enteredAt: v.enteredAt.toISOString(), exitedAt: v.exitedAt?.toISOString() ?? null })),
@@ -522,6 +529,17 @@ export async function updateGuest(db: Db, actor: SessionUser, guestId: string, i
   return { ok: true };
 }
 
+// Dados da viagem da FNRH (motivo, transporte, procedência, destino).
+export async function updateTrip(db: Db, actor: SessionUser, reservationId: string, input: unknown): Promise<Result> {
+  const no = denied(actor);
+  if (no) return no;
+  const parsed = tripSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  await db.reservation.update({ where: { id: reservationId }, data: parsed.data });
+  await audit(db, "reservation.trip", { userId: actor.id, metadata: { id: reservationId } });
+  return { ok: true };
+}
+
 export async function addCompanion(db: Db, actor: SessionUser, reservationId: string, input: unknown): Promise<Result> {
   const no = denied(actor);
   if (no) return no;
@@ -620,6 +638,7 @@ const checkInSchema = z.object({
   roomId: z.uuid("Escolha o quarto."),
   guest: guestSchema,
   vehicle: vehicleSchema.optional(),
+  trip: tripSchema.optional(),
 });
 
 export async function checkIn(db: Db, actor: SessionUser, id: string, input: unknown): Promise<Result<Rooms>> {
@@ -627,7 +646,7 @@ export async function checkIn(db: Db, actor: SessionUser, id: string, input: unk
   if (no) return no;
   const parsed = checkInSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  const { roomId, guest, vehicle } = parsed.data;
+  const { roomId, guest, vehicle, trip } = parsed.data;
 
   if (!guest.docNumber) {
     return { ok: false, error: "Revise os campos destacados.", fieldErrors: { docNumber: ["Documento obrigatório no check-in (ficha do hóspede)."] } };
@@ -664,7 +683,7 @@ export async function checkIn(db: Db, actor: SessionUser, id: string, input: unk
   try {
     await db.reservation.update({
       where: { id },
-      data: { status: "HOSPEDADA", roomId, roomTypeId: room.roomTypeId, checkedInAt: new Date() },
+      data: { status: "HOSPEDADA", roomId, roomTypeId: room.roomTypeId, checkedInAt: new Date(), ...(trip ?? {}) },
     });
   } catch (error) {
     const msg = overlapError(error);
@@ -703,6 +722,7 @@ export async function walkIn(db: Db, actor: SessionUser, input: unknown): Promis
     roomId: stay.roomId,
     guest: raw.guest,
     vehicle: (input as { vehicle?: unknown }).vehicle,
+    trip: (input as { trip?: unknown }).trip,
   });
   if (!done.ok) throw new Error(done.error); // desfaz a transação inteira
   return { ok: true, id: created.id, rooms: done.rooms };

@@ -1,0 +1,13 @@
+{
+  "name": "hotel-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "App de computador (Windows, Mac, Linux) do sistema do hotel",
+  "scripts": {
+    "icones": "tauri icon ../mobile/assets/icon.png",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

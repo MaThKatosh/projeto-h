@@ -10,7 +10,7 @@ import type { Availability } from "@/lib/reservations/service";
 import { addDays, formatDate, nightsBetween, type DateStr } from "@/lib/dates";
 import { centsToInput, formatBRL, parseBRL } from "@/lib/money";
 import { computeTotals, SOURCE_LABEL, SOURCES, type Source } from "@/lib/reservations/rules";
-import { GuestFields, readGuest, readVehicle, VehicleFields } from "./guest-fields";
+import { GuestFields, readGuest, readTrip, readVehicle, TripFields, VehicleFields } from "./guest-fields";
 import {
   availabilityAction,
   createReservationAction,
@@ -157,7 +157,7 @@ export function StayForm({
           return;
         }
       } else if (mode === "direto") {
-        result = await walkInAction({ stay, guest: readGuest(form), vehicle: readVehicle(form) });
+        result = await walkInAction({ stay, guest: readGuest(form), vehicle: readVehicle(form), trip: readTrip(form) });
       } else {
         result = await createReservationAction(guest ? { guestId: guest.id, stay } : { guest: readGuest(form), stay });
       }
@@ -383,10 +383,16 @@ export function StayForm({
       </section>
 
       {mode === "direto" && (
-        <section className="card space-y-3 p-5">
-          <h2 className="font-semibold">{tr("4. Veículo na garagem (opcional)")}</h2>
-          <VehicleFields errors={fe} />
-        </section>
+        <>
+          <section className="card space-y-3 p-5">
+            <h2 className="font-semibold">{tr("4. Viagem (ficha FNRH)")}</h2>
+            <TripFields />
+          </section>
+          <section className="card space-y-3 p-5">
+            <h2 className="font-semibold">{tr("5. Veículo na garagem (opcional)")}</h2>
+            <VehicleFields errors={fe} />
+          </section>
+        </>
       )}
 
       <FormMessage error={errors.error} />

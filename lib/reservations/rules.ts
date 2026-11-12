@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { guestFnrhFields } from "@/lib/guests/fnrh";
 import { isDateStr, nightsBetween, type DateStr } from "@/lib/dates";
 import { parseBRL } from "@/lib/money";
 import { displayStatus, type RoomState } from "@/lib/rooms/status";
@@ -116,6 +117,7 @@ export const guestSchema = z.object({
   nationality: optionalText(40),
   city: optionalText(60),
   state: optionalText(30),
+  ...guestFnrhFields,
   notes: optionalText(500),
 });
 
