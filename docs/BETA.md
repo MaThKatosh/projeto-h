@@ -14,9 +14,11 @@ powershell -ExecutionPolicy Bypass -File deploy\beta\iniciar-beta.ps1
   `https://....trycloudflare.com` (mostrado na tela e salvo em `deploy/beta/link.txt`).
 - **Deixe a janela aberta** e o PC ligado (sem suspender). Fechou → o link para.
 - O link **muda** cada vez que o script roda de novo (ex.: depois de reiniciar o PC).
-  Aí: mande o link novo para os amigos e gere os apps beta de novo
-  (*GitHub → Actions → Apps (instaladores) → Run workflow*, campo **beta_url** = link novo).
-  No app, o amigo também pode tocar em "Trocar servidor" e colar o link novo.
+  O script publica o link novo num **gist secreto** do seu GitHub
+  (`deploy/beta/gist-id.txt`), e os **apps beta consultam esse gist ao abrir**: eles
+  acham o link novo sozinhos (pode levar até 5 minutos). Só quem usa pelo navegador
+  precisa receber o link novo.
+- Se o PC suspender ou a janela fechar, o link cai: rode o script de novo.
 
 ## O que os amigos veem
 
