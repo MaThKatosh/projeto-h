@@ -43,6 +43,14 @@ if (-not (Test-Path $envFile)) {
     $lines += @("MODE=local", "SERVER_ADDRESS=$ip")
     $url = "https://$ip"
   }
+  # Segunda cópia do backup fora do servidor (OneDrive sobe sozinho para a nuvem).
+  $sugestao = if ($env:OneDrive) { Join-Path $env:OneDrive "Backups Sistema Hotel" } else { "" }
+  $copia = Read-Host "Pasta para a cópia extra do backup (OneDrive, Google Drive, HD externo) [$sugestao]"
+  if (-not $copia) { $copia = $sugestao }
+  if ($copia) {
+    New-Item -ItemType Directory -Force $copia | Out-Null
+    $lines += "BACKUP_COPY_DIR=$copia"
+  }
   # UTF-8 sem BOM (o docker compose lê melhor assim)
   [System.IO.File]::WriteAllLines($envFile, $lines, (New-Object System.Text.UTF8Encoding $false))
   New-Item -ItemType Directory -Force (Join-Path $PSScriptRoot "backups") | Out-Null

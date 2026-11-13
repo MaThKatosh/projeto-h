@@ -88,8 +88,12 @@ instalado, atualiza o banco sozinho e mantém todos os dados.
 
 - O serviço `backup` faz uma cópia completa do banco **todo dia** em `deploy/backups/`
   (arquivos `hotel-AAAA-MM-DD_HHMM.dump`) e apaga as com mais de 30 dias.
-- **Copie essa pasta para fora do servidor** com frequência (pendrive, Google Drive,
-  OneDrive). Se o computador queimar, é ela que salva o hotel.
+- Cada cópia também vai, sozinha, para uma **segunda pasta** escolhida na instalação
+  (`BACKUP_COPY_DIR` no `deploy/.env`). No Windows o instalador sugere a pasta do
+  **OneDrive**, que sobe para a nuvem de graça; serve também Google Drive, Dropbox ou
+  um HD externo. Se o computador queimar, é essa cópia que salva o hotel.
+- Para mudar a pasta depois: edite `BACKUP_COPY_DIR` em `deploy/.env` e rode o
+  instalador de novo.
 - Para voltar uma cópia (apaga os dados atuais!):
   ```
   bash deploy/restaurar-backup.sh deploy/backups/hotel-2026-12-01_0300.dump

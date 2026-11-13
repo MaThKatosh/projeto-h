@@ -90,7 +90,7 @@ export function Folio({
       {error && <p className="mt-2 text-sm text-red-700">{tr(error)}</p>}
 
       {mode === "pagamento" && (
-        <PaymentForm reservationId={reservationId} suggested={Math.max(0, folio.balance + (inHouse ? folio.checkoutPreview : 0))} options={options} onClose={() => setMode(null)} onDone={finish} />
+        <PaymentForm key={folio.balance} reservationId={reservationId} suggested={Math.max(0, folio.balance + (inHouse ? folio.checkoutPreview : 0))} options={options} onClose={() => setMode(null)} onDone={finish} />
       )}
       {mode === "cobranca" && <ChargeForm reservationId={reservationId} onClose={() => setMode(null)} onDone={finish} />}
       {mode === "devolucao" && <RefundForm reservationId={reservationId} credit={-folio.balance} onClose={() => setMode(null)} onDone={finish} />}

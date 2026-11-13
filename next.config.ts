@@ -9,6 +9,8 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .filter(Boolean);
 
 const nextConfig: NextConfig = {
+  // Testes de ponta a ponta montam numa pasta separada para não atrapalhar o dev.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   allowedDevOrigins,
   // Não repassar o console do navegador para o servidor: neste Windows o
   // arquivo de log (.next/dev/logs) disparava recompilação → recarga da

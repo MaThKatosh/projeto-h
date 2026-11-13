@@ -5,7 +5,8 @@
 #   app     — o sistema
 #   db      — banco de dados (não fica exposto na rede)
 #   caddy   — HTTPS: certificado próprio na rede do hotel, ou Let's Encrypt na nuvem
-#   backup  — cópia do banco todo dia em deploy/backups (guarda 30 dias)
+#   backup  — cópia do banco todo dia em deploy/backups (guarda 30 dias) e uma
+#             segunda cópia em BACKUP_COPY_DIR (ex.: pasta do OneDrive/Google Drive)
 
 name: hotel
 
@@ -71,14 +72,20 @@ services:
       TZ: America/Sao_Paulo
     volumes:
       - ./backups:/backups
+      # Segunda cópia fora do servidor: pasta sincronizada com a nuvem (OneDrive,
+      # Google Drive, Dropbox) ou um HD externo. Sem configurar, fica em deploy/backups-copia.
+      - ${BACKUP_COPY_DIR:-./backups-copia}:/copia
     entrypoint:
       - /bin/sh
       - -c
       - |
         while true; do
           f=/backups/hotel-$$(date +%Y-%m-%d_%H%M).dump
-          if pg_dump -h db -U hotel -d hotel -Fc -f "$$f"; then echo "[backup] ok $$f"; else echo "[backup] FALHOU"; rm -f "$$f"; fi
-          find /backups -name 'hotel-*.dump' -mtime +30 -delete
+          if pg_dump -h db -U hotel -d hotel -Fc -f "$$f"; then
+            echo "[backup] ok $$f"
+            cp "$$f" /copia/ && echo "[backup] copiado para a pasta extra" || echo "[backup] FALHOU a cópia extra"
+          else echo "[backup] FALHOU"; rm -f "$$f"; fi
+          find /backups /copia -name 'hotel-*.dump' -mtime +30 -delete
           sleep 86400
         done
 

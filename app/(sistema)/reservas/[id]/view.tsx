@@ -510,7 +510,7 @@ function CheckOutPanel({
           </div>
           {folio.balance > 0 && nightsLeft === 0 && canPost && (
             <>
-              <PaymentForm reservationId={r.id} suggested={folio.balance} options={paymentOptions} onClose={() => undefined} onDone={step} />
+              <PaymentForm key={folio.balance} reservationId={r.id} suggested={folio.balance} options={paymentOptions} onClose={() => undefined} onDone={step} />
               <PendingForm r={r} folio={folio} inPending={inPending} onDone={step} />
             </>
           )}

@@ -43,7 +43,8 @@ Em desenvolvimento, coloque esse IP em `ALLOWED_DEV_ORIGINS` no `.env`.
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Sistema em modo desenvolvimento |
-| `npm test` | Testes automáticos |
+| `npm test` | Testes automáticos (regras) |
+| `npm run e2e` | Testes de ponta a ponta num navegador de verdade (Edge) |
 | `npm run typecheck` / `npm run lint` | Verificações de código |
 | `npm run db:migrate` | Cria uma migration nova após mudar o `schema.prisma` |
 | `npm run db:studio` | Abre o banco num navegador para inspecionar |
@@ -118,3 +119,4 @@ docs/               uma página por fase
 - [x] **Fase 7** — instalação com HTTPS (PC do hotel ou nuvem) e backup diário, app instalável + apps nativos, importação de reservas dos portais e API para channel manager, ficha FNRH ([docs/FASE-7.md](docs/FASE-7.md))
 - [x] **Fase 8** — contas pendentes, ficha validada (CPF, datas, CEP, países) e check-in só com fichas completas, recepção em abas, vagas da garagem, pedidos do hóspede por QR code, borderô por usuário e setor, revenue management ([docs/FASE-8.md](docs/FASE-8.md))
 - [x] **Fase 9** — check-in mostra o que falta, relatório de saídas para a governança, mapa com portas, instaladores dos apps publicados em Releases ([docs/FASE-9.md](docs/FASE-9.md))
+- [x] **Fase 10** — manual dos funcionários (❓ Ajuda), LGPD (política, exportar, anonimizar), importar hóspedes do sistema antigo, backup copiado para o OneDrive, testes de ponta a ponta ([docs/FASE-10.md](docs/FASE-10.md))

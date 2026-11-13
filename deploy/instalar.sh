@@ -35,6 +35,8 @@ if [ ! -f .env ]; then
     { echo "MODE=local"; echo "SERVER_ADDRESS=$ip"; } >> .env
     url="https://$ip"
   fi
+  read -rp "Pasta para a cópia extra do backup (Google Drive, Dropbox, HD externo; vazio = deploy/backups-copia): " copia
+  if [ -n "$copia" ]; then mkdir -p "$copia"; echo "BACKUP_COPY_DIR=$copia" >> .env; fi
   chmod 600 .env
   mkdir -p backups
   echo

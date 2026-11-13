@@ -7,7 +7,7 @@ import { roomToken } from "@/lib/requests/service";
 import { getHotelSettings } from "@/lib/settings";
 import { getT } from "@/lib/i18n/server";
 import { PrintButton } from "../../relatorios/[slug]/print-button";
-import { RotateButton } from "./rotate-button";
+import { CopyLinkButton, RotateButton } from "./rotate-button";
 
 export const dynamic = "force-dynamic";
 
@@ -47,12 +47,13 @@ export default async function QrPage() {
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 print:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.id} className="break-inside-avoid rounded-xl border-2 border-dashed border-zinc-300 bg-white p-3 text-center">
+          <div key={c.id} data-room={c.number} data-url={c.url} className="break-inside-avoid rounded-xl border-2 border-dashed border-zinc-300 bg-white p-3 text-center">
             <div className="text-xs text-zinc-500">{settings.hotelName}</div>
             <div className="text-2xl font-black">{tr("Quarto {0}", [c.number])}</div>
             <div className="mx-auto my-2 w-36" dangerouslySetInnerHTML={{ __html: c.svg }} />
             <div className="text-sm font-semibold">{tr("Precisa de algo? Aponte a câmera.")}</div>
             <div className="text-[10px] text-zinc-500">Need anything? Scan me · ¿Necesita algo? Escanee</div>
+            <CopyLinkButton url={c.url} />
             <RotateButton roomId={c.id} />
           </div>
         ))}

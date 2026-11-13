@@ -49,3 +49,7 @@ deploy/backups/
 deploy/beta/build-beta.log
 deploy/beta/link.txt
 deploy/beta/tunnel.log
+deploy/backups-copia/
+.next-e2e/
+test-results/
+playwright-report/

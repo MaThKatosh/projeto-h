@@ -32,6 +32,7 @@ function navFor(role: Parameters<typeof can>[0], tr: TFunction, requests: number
     ...(can(role, "revenue.manage") ? [{ href: "/revenue", label: tr("Revenue (preços)"), icon: "📈" }] : []),
     ...(can(role, "audit.run") ? [{ href: "/auditoria", label: tr("Auditoria noturna"), icon: "🌙" }] : []),
     { href: "/relatorios", label: tr("Relatórios"), icon: "📊" },
+    { href: "/ajuda", label: tr("Ajuda"), icon: "❓" },
     ...(isDemo() && can(role, "settings.manage") ? [{ href: "/sugestoes", label: tr("Sugestões dos testadores"), icon: "💬", group: "Administração" }] : []),
     ...(can(role, "settings.manage") ? [{ href: "/configuracoes", label: tr("Configurações"), icon: "⚙️", group: "Administração" }] : []),
     ...(can(role, "rooms.manage") ? [{ href: "/quartos", label: tr("Cadastro de quartos"), icon: "🏨", group: "Administração" }] : []),

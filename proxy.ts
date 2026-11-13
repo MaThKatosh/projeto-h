@@ -4,7 +4,7 @@ import { SESSION_COOKIE } from "@/lib/auth/cookie";
 // Checagem RÁPIDA: só vê se o cookie existe. A verificação real é feita
 // por verifySession() em cada página e ação (lib/auth/dal.ts).
 
-const PUBLIC_PATHS = ["/entrar"];
+const PUBLIC_PATHS = ["/entrar", "/privacidade"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

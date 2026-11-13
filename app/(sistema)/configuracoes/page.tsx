@@ -40,6 +40,8 @@ export default async function ConfiguracoesPage() {
     { href: "/tarifas", icon: "💲", title: tr("Tarifas, ISS e estacionamento"), text: tr("{0} tarifa(s) ativa(s). Estacionamento: {1}.", [plans, parking ? tr("{0} por noite", [formatBRL(parking)]) : tr("grátis")]) },
     { href: "/cardapio", icon: "📋", title: tr("Cardápios, mesas e taxa de serviço"), text: tr("Restaurante: {0} itens · Frigobar: {1} itens · {2} mesas · serviço {3}%.", [count("RESTAURANTE"), count("FRIGOBAR"), tables, fee / 100]) },
     { href: "/usuarios", icon: "👥", title: tr("Usuários e cargos"), text: tr("{0} usuários ativos. Criar, trocar cargo, redefinir senha, desativar.", [users]) },
+    { href: "/configuracoes/privacidade", icon: "🔒", title: tr("Privacidade dos hóspedes (LGPD)"), text: tr("Exportar os dados de um hóspede, anonimizar a pedido ou cadastros antigos.") },
+    { href: "/configuracoes/importar-hospedes", icon: "📥", title: tr("Importar hóspedes"), text: tr("Trazer o cadastro de hóspedes do sistema antigo (planilha).") },
     { href: "/auditoria", icon: "🌙", title: tr("Auditoria noturna"), text: lastRun ? tr("Última: {0}. Dá para desfazer a última por lá.", [lastRun.businessDate.toISOString().slice(0, 10).split("-").reverse().join("/")]) : tr("Nenhuma ainda.") },
   ];
 

@@ -104,7 +104,7 @@ export function GuestRequestScreen({ token, requests }: { token: string; request
           </ul>
         </div>
       )}
-      <p className="text-center text-xs text-white/70">{tr("Urgências: ligue para a recepção.")}</p>
+      <p className="text-center text-xs text-white/70">{tr("Urgências: ligue para a recepção.")}{" · "}<a href="/privacidade" className="underline">{tr("Política de privacidade")}</a></p>
     </div>
   );
 }

@@ -24,6 +24,7 @@ export default async function EntrarPage() {
         <LoginForm />
         {isDemo() && <DemoAccounts accounts={DEMO_ACCOUNTS.map(({ username, hint }) => ({ username, hint }))} password={DEMO_PASSWORD} />}
         <LanguageSwitch />
+        <p className="mt-3 text-center text-[11px]"><a href="/privacidade" className="text-zinc-400 underline">{tr("Política de privacidade")}</a></p>
       </div>
     </main>
   );

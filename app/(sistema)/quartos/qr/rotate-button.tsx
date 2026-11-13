@@ -26,3 +26,17 @@ export function RotateButton({ roomId }: { roomId: string }) {
     </button>
   );
 }
+
+// Copia o link do QR (para a equipe testar sem celular ou mandar ao hóspede).
+export function CopyLinkButton({ url }: { url: string }) {
+  const tr = useT();
+  return (
+    <button
+      type="button"
+      className="no-print mt-1 mr-2 text-[11px] text-blue-700 underline"
+      onClick={() => navigator.clipboard?.writeText(url).then(() => alert(tr("Link copiado.")), () => prompt(tr("Copie o link:"), url))}
+    >
+      {tr("copiar link")}
+    </button>
+  );
+}
