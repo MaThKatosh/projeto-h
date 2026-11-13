@@ -15,6 +15,10 @@ on:
         description: "Versão beta: endereço do servidor de teste (vazio = app normal, que pergunta o endereço)"
         type: string
         default: ""
+      beta_discovery:
+        description: "Versão beta: endereço fixo (gist raw) que informa o link atual, para os apps acharem o link novo sozinhos"
+        type: string
+        default: ""
 
 jobs:
   desktop:
@@ -37,7 +41,7 @@ jobs:
       - name: Preparar versão beta
         if: inputs.beta_url != ''
         shell: bash
-        run: node apps/preparar-beta.mjs "${{ inputs.beta_url }}"
+        run: node apps/preparar-beta.mjs "${{ inputs.beta_url }}" "${{ inputs.beta_discovery }}"
       - name: Montar
         working-directory: apps/desktop
         run: |
@@ -65,7 +69,7 @@ jobs:
       - name: Preparar versão beta
         if: inputs.beta_url != ''
         shell: bash
-        run: node apps/preparar-beta.mjs "${{ inputs.beta_url }}"
+        run: node apps/preparar-beta.mjs "${{ inputs.beta_url }}" "${{ inputs.beta_discovery }}"
       - name: Montar
         working-directory: apps/desktop
         run: |
@@ -88,7 +92,7 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - name: Preparar versão beta
         if: inputs.beta_url != ''
-        run: node apps/preparar-beta.mjs "${{ inputs.beta_url }}"
+        run: node apps/preparar-beta.mjs "${{ inputs.beta_url }}" "${{ inputs.beta_discovery }}"
       - name: Montar APK
         working-directory: apps/mobile
         run: |

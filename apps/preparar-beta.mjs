@@ -1,5 +1,6 @@
 // Prepara a versão beta dos apps: endereço do servidor embutido e nome/ID
-// próprios (instala ao lado do app normal). Uso: node apps/preparar-beta.mjs https://...
+// próprios (instala ao lado do app normal).
+// Uso: node apps/preparar-beta.mjs https://link-atual [https://endereco-fixo-que-diz-o-link-atual]
 import { readFileSync, writeFileSync } from "node:fs";
 
 const url = (process.argv[2] || "").trim().replace(/\/+$/, "");
@@ -7,7 +8,16 @@ if (!/^https?:\/\/[\w.-]+(:\d+)?$/.test(url)) {
   console.error("Endereço inválido:", url);
   process.exit(1);
 }
-writeFileSync("apps/conectar/config.js", `// Versão beta: servidor embutido.\nwindow.HOTEL_SERVER = ${JSON.stringify(url)};\n`);
+// Endereço fixo que diz qual é o link atual (gist): o app consulta ao abrir.
+const discovery = (process.argv[3] || "").trim();
+if (discovery && !/^https:\/\/\S+$/.test(discovery)) {
+  console.error("Endereço de descoberta inválido:", discovery);
+  process.exit(1);
+}
+writeFileSync(
+  "apps/conectar/config.js",
+  `// Versão beta: servidor embutido (e onde perguntar o link atual, se ele mudar).\nwindow.HOTEL_SERVER = ${JSON.stringify(url)};\nwindow.HOTEL_DISCOVERY = ${JSON.stringify(discovery)};\n`
+);
 
 const tauri = "apps/desktop/src-tauri/tauri.conf.json";
 const t = JSON.parse(readFileSync(tauri, "utf8"));

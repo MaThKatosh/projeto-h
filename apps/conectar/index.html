@@ -80,6 +80,13 @@
       location.replace(origin + "/mapa");
       return;
     }
+    // Link guardado morreu? Pergunta de novo o link atual e tenta mais uma vez.
+    if (!fromForm && !open.retried) {
+      open.retried = true;
+      await discover();
+      const fresh = localStorage.getItem(KEY);
+      if (fresh && fresh !== origin) return open(fresh, false);
+    }
     $("go").disabled = false;
     showForm(
       fromForm
@@ -101,20 +108,45 @@
 
   // Versão beta: o endereço vem embutido. Se o app novo trouxer outro
   // endereço (o link do beta mudou), ele passa a valer.
-  const preset = (window.HOTEL_SERVER || "").replace(/\/+$/, "");
-  if (preset && localStorage.getItem("hotel.preset") !== preset) {
-    localStorage.setItem("hotel.preset", preset);
-    localStorage.setItem(KEY, preset);
+  function usePreset(value) {
+    const p = (value || "").trim().replace(/\/+$/, "");
+    if (/^https?:\/\/[\w.-]+(:\d+)?$/.test(p) && localStorage.getItem("hotel.preset") !== p) {
+      localStorage.setItem("hotel.preset", p);
+      localStorage.setItem(KEY, p);
+    }
   }
-  const saved = localStorage.getItem(KEY);
-  if (saved) {
-    // 2 segundos para dar tempo de tocar em "Trocar servidor".
+  usePreset(window.HOTEL_SERVER);
+
+  // Versão beta: o link do servidor muda às vezes. O app pergunta o link atual
+  // num endereço fixo (gist) antes de conectar; sem internet, segue o guardado.
+  async function discover() {
+    if (!window.HOTEL_DISCOVERY) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const res = await fetch(window.HOTEL_DISCOVERY + "?t=" + Date.now(), { cache: "no-store", signal: ctrl.signal });
+      if (res.ok) usePreset(await res.text());
+    } catch {
+      // sem acesso ao gist: usa o último endereço conhecido
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function start() {
     $("connecting").style.display = "block";
-    $("target").textContent = saved;
-    auto = setTimeout(() => open(saved, false), 2000);
-  } else {
-    showForm();
+    $("target").textContent = window.HOTEL_DISCOVERY ? "…" : "";
+    await discover();
+    const saved = localStorage.getItem(KEY);
+    if (saved) {
+      // 2 segundos para dar tempo de tocar em "Trocar servidor".
+      $("target").textContent = saved;
+      auto = setTimeout(() => open(saved, false), 2000);
+    } else {
+      showForm();
+    }
   }
+  start();
 </script>
 </body>
 </html>

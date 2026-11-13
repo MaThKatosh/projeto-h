@@ -40,6 +40,18 @@ for ($i = 0; $i -lt 40 -and -not $url; $i++) {
 if (-not $url) { Write-Host "Não consegui criar o link. Veja $log" -ForegroundColor Red; Stop-Process $p -ErrorAction SilentlyContinue; exit 1 }
 Set-Content -Path (Join-Path $PSScriptRoot "link.txt") -Value $url -Encoding utf8
 
+# Publica o link no gist secreto: os apps beta consultam esse endereço fixo e
+# acham o link novo sozinhos (não precisa reinstalar quando o link muda).
+$gistFile = Join-Path $PSScriptRoot "gist-id.txt"
+if ((Test-Path $gistFile) -and (Get-Command gh -ErrorAction SilentlyContinue)) {
+  $gistId = (Get-Content $gistFile -Raw).Trim()
+  $tmp = Join-Path $env:TEMP "beta-link.txt"
+  [System.IO.File]::WriteAllText($tmp, $url, (New-Object System.Text.UTF8Encoding $false))
+  gh gist edit $gistId --filename beta-link.txt $tmp
+  if ($LASTEXITCODE -eq 0) { Write-Host "Link publicado para os apps (pode levar até 5 minutos para eles verem)." -ForegroundColor Cyan }
+  else { Write-Host "Não consegui atualizar o gist (gh auth login?). Os apps vão continuar com o link antigo." -ForegroundColor Yellow }
+}
+
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor Green
 Write-Host " Link do beta: $url" -ForegroundColor Green
